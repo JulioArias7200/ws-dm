@@ -28,42 +28,6 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
           rel="stylesheet"
         />
-        {/* Tailwind CDN y tokens de diseño para renderizado instantáneo y consistente en Vercel */}
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              tailwind.config = {
-                darkMode: "class",
-                theme: {
-                  extend: {
-                    colors: {
-                      primary: "#005cb8",
-                      "primary-container": "#1275e2",
-                      "on-primary": "#ffffff",
-                      "on-primary-container": "#000512",
-                      secondary: "#465f88",
-                      surface: "#f9f9ff",
-                      "surface-container": "#ebedf7",
-                      "surface-container-high": "#e6e8f1",
-                      "surface-container-highest": "#e0e2eb",
-                      "surface-container-low": "#f1f3fc",
-                      "surface-container-lowest": "#ffffff",
-                      "on-surface": "#181c22",
-                      "on-surface-variant": "#414753",
-                      outline: "#717785",
-                      "outline-variant": "#c1c6d5",
-                    },
-                    fontFamily: {
-                      sans: ["Inter", "Plus Jakarta Sans", "sans-serif"],
-                      mono: ["JetBrains Mono", "monospace"],
-                    }
-                  }
-                }
-              };
-            `,
-          }}
-        />
       </head>
       <body className="bg-surface text-on-surface font-sans min-h-screen flex antialiased">
         {/* Barra Lateral / Sidebar Global */}
