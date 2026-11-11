@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,32 +10,62 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing & Coverage
 /coverage
 
-# next.js
+# Next.js Build Output
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Debug & Error Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+next-panic-*.log
+*.log
 
-# env files (can opt-in for committing if needed)
-.env*
+# Environment Variables (Keep credentials private)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
 
-# vercel
+# Vercel Deployment Cache
 .vercel
 
-# typescript
+# TypeScript & Next.js Typings
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright Test & Scraping Artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+data_scraped_*.json
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python / R Local Artifacts (if running scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.Rhistory
+.RData
+.Rproj.user
+Rplots.pdf
