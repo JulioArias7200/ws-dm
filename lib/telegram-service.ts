@@ -69,17 +69,10 @@ export interface BotReply {
 }
 
 export const TELEGRAM_COMMANDS_MENU = [
-  { command: 'start', description: 'Menú principal interactivo' },
-  { command: 'sicoes', description: 'Menú SICOES (Licitaciones La Paz)' },
-  { command: 'canasta', description: 'Precios Canasta Familiar (OAP La Paz)' },
-  { command: 'salud', description: 'Centros de Salud georreferenciados' },
-  { command: 'buscar', description: 'Búsqueda semántica pgvector en SICOES' },
-  { command: 'vigentes', description: 'Licitaciones abiertas vigentes' },
-  { command: 'cerradas', description: 'Adjudicadas, contratadas o desiertas' },
-  { command: 'cuce', description: 'Ficha oficial por código CUCE' },
-  { command: 'entidades_top', description: 'Ranking PageRank de entidades y rubros' },
-  { command: 'hubs_authorities', description: 'Análisis HITS (Hubs vs Authorities)' },
-  { command: 'stats', description: 'Estadísticas en vivo de Neon DB' },
+  { command: 'start', description: 'Información del bot y guía de comandos' },
+  { command: 'sicoes', description: 'Módulo SICOES: licitaciones La Paz e IA' },
+  { command: 'canasta', description: 'Módulo Canasta Familiar (precios OAP)' },
+  { command: 'salud', description: 'Módulo Centros de Salud y GPS (La Paz)' },
 ];
 
 const BACK_TO_HOME_ROW: InlineKeyboardButton[] = [{ text: '⬅️ Menú Principal', callback_data: 'menu_home' }];
@@ -134,24 +127,25 @@ function formatDateBo(iso: string | null | undefined, fallback = 'Por confirmar'
 function buildMainMenu(firstName: string): { text: string; replyMarkup: ReplyMarkup } {
   const text =
     `🏛️ <b>SICOES-Miner La Paz</b> ✨\n` +
-    `<i>Inteligencia Web, Canasta Familiar y Centros de Salud</i>\n\n` +
+    `<i>Bot ciudadano de Minería Web en tiempo real (Neon PostgreSQL + IA)</i>\n\n` +
     `Hola <b>${escHtml(firstName || 'Ciudadano')}</b> 👋\n\n` +
-    `<blockquote>🏛️ <b>SICOES</b> — Licitaciones reales, pgvector y PageRank\n` +
-    `🛒 <b>Canasta Familiar</b> — Precios oficiales OAP en La Paz\n` +
-    `🏥 <b>Centros de Salud</b> — Hospitales, clínicas y farmacias GPS\n` +
-    `📊 <b>Telemetría</b> — Métricas en vivo y minería de uso</blockquote>\n\n` +
-    `⬇️ <b>Elige un módulo abajo:</b>`;
+    `<blockquote>📌 <b>Comandos del Menú (≡):</b>\n` +
+    `• <code>/start</code> — Información resumida y comandos del bot\n` +
+    `• <code>/sicoes</code> — Licitaciones La Paz, IA pgvector y grafos PageRank/HITS\n` +
+    `• <code>/canasta</code> — Precios Canasta Familiar OAP Bolivia (La Paz y Eje)\n` +
+    `• <code>/salud</code> — Hospitales, clínicas y farmacias OSM + Google Maps\n\n` +
+    `⚡ <b>Atajos directos por texto o GPS:</b>\n` +
+    `• <code>/buscar &lt;tema&gt;</code> | <code>/cuce &lt;código&gt;</code>\n` +
+    `• <code>/canasta &lt;producto&gt;</code> | <code>/salud &lt;zona&gt;</code>\n` +
+    `• Envía tu 📍 <b>ubicación GPS</b> (📎 → Ubicación) para ver centros cercanos</blockquote>\n\n` +
+    `⬇️ <b>Selecciona un módulo o usa el menú inferior:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
-      [{ text: '🏛️ SICOES — Licitaciones La Paz', callback_data: 'menu_sicoes' }],
+      [{ text: '🏛️ SICOES — Licitaciones e IA', callback_data: 'menu_sicoes' }],
       [
         { text: '🛒 Canasta Familiar', callback_data: 'menu_canasta' },
         { text: '🏥 Centros de Salud', callback_data: 'menu_salud' },
-      ],
-      [
-        { text: '📊 Estadísticas', callback_data: 'sicoes_stats' },
-        { text: '❓ Comandos / Ayuda', callback_data: 'menu_help' },
       ],
       [{ text: '🌐 Abrir Plataforma Web', url: 'https://ws-dm.vercel.app' }],
     ],
@@ -162,19 +156,22 @@ function buildMainMenu(firstName: string): { text: string; replyMarkup: ReplyMar
 
 function buildSicoesMenu(): { text: string; replyMarkup: ReplyMarkup } {
   const text =
-    `🏛️ <b>Menú SICOES — La Paz</b>\n\n` +
-    `<blockquote>Consulta convocatorias reales extraídas de <code>sicoes.gob.bo</code>, ranking PageRank / HITS y búsqueda semántica vectorial en <code>pgvector</code>.</blockquote>\n\n` +
-    `⬇️ <b>Selecciona una acción:</b>`;
+    `🏛️ <b>Módulo SICOES — La Paz</b>\n\n` +
+    `<blockquote><b>Descripción del módulo:</b>\n` +
+    `Monitorea contrataciones públicas reales del departamento de <b>La Paz</b> extraídas de <code>sicoes.gob.bo</code> e indexadas en Neon PostgreSQL (<code>pgvector</code>).\n\n` +
+    `Permite revisar convocatorias abiertas o cerradas, buscar por similitud semántica con IA (<code>/buscar &lt;texto&gt;</code>), consultar fichas por código (<code>/cuce &lt;id&gt;</code>) y analizar la red con <b>PageRank</b> y <b>HITS</b>.</blockquote>\n\n` +
+    `⬇️ <b>Elige una acción de SICOES:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
       [
         { text: '🟢 Vigentes', callback_data: 'sicoes_vigentes' },
         { text: '🔴 Cerradas', callback_data: 'sicoes_cerradas' },
+        { text: '🆕 Recientes', callback_data: 'sicoes_recientes' },
       ],
       [
-        { text: '🆕 Recientes', callback_data: 'sicoes_recientes' },
         { text: '🔍 Buscar con IA', callback_data: 'sicoes_buscar_hint' },
+        { text: '🆔 Ficha CUCE', callback_data: 'sicoes_cuce_hint' },
       ],
       [
         { text: '🏆 Top PageRank', callback_data: 'sicoes_entidades' },
@@ -185,7 +182,10 @@ function buildSicoesMenu(): { text: string; replyMarkup: ReplyMarkup } {
         { text: '📦 Bienes', callback_data: 'sicoes_rubro_Bienes' },
         { text: '🛠️ Servicios', callback_data: 'sicoes_rubro_Servicios' },
       ],
-      BACK_TO_HOME_ROW,
+      [
+        { text: '📊 Estadísticas', callback_data: 'sicoes_stats' },
+        { text: '🏠 Inicio', callback_data: 'menu_home' },
+      ],
     ],
   };
 
@@ -194,10 +194,11 @@ function buildSicoesMenu(): { text: string; replyMarkup: ReplyMarkup } {
 
 function buildCanastaMenu(): { text: string; replyMarkup: ReplyMarkup } {
   const text =
-    `🛒 <b>Menú Canasta Familiar — La Paz</b>\n\n` +
-    `<blockquote>Precios referenciales diarios reales del <b>Observatorio Agroambiental y Productivo (OAP Bolivia)</b> en mercados de La Paz y comparación con el Eje Troncal.</blockquote>\n\n` +
-    `💡 <i>También puedes escribir:</i> <code>/canasta papa</code> o <code>/canasta pollo</code>\n\n` +
-    `⬇️ <b>Elige una categoría:</b>`;
+    `🛒 <b>Módulo Canasta Familiar — La Paz</b>\n\n` +
+    `<blockquote><b>Descripción del módulo:</b>\n` +
+    `Consulta precios referenciales diarios reales publicados por el <b>Observatorio Agroambiental y Productivo (OAP Bolivia)</b> en mercados de La Paz.\n\n` +
+    `Permite explorar productos por categoría, comparar precios entre <b>La Paz, Cochabamba y Santa Cruz</b>, sincronizar la base OAP o buscar directo escribiendo <code>/canasta papa</code> o <code>/canasta pollo</code>.</blockquote>\n\n` +
+    `⬇️ <b>Elige una categoría o herramienta:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
@@ -207,7 +208,7 @@ function buildCanastaMenu(): { text: string; replyMarkup: ReplyMarkup } {
       ],
       [
         { text: '🌾 Arroz, Aceite y Frutas', callback_data: 'canasta_cat_abarrotes' },
-        { text: '📈 Comparar La Paz/CBBA/SCZ', callback_data: 'canasta_comparar' },
+        { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
       ],
       [
         { text: '🔄 Actualizar OAP', callback_data: 'canasta_sync' },
@@ -222,9 +223,10 @@ function buildCanastaMenu(): { text: string; replyMarkup: ReplyMarkup } {
 
 function buildSaludMenu(): { text: string; replyMarkup: ReplyMarkup } {
   const text =
-    `🏥 <b>Menú Centros de Salud — La Paz</b>\n\n` +
-    `<blockquote>Directorio georreferenciado real de hospitales, clínicas y farmacias en <b>La Paz</b> vía <b>OpenStreetMap</b>, con coordenadas y ruta directa en Google Maps.</blockquote>\n\n` +
-    `💡 <i>Tip:</i> Escribe <code>/salud Obrero</code> o envía tu <b>ubicación GPS (📎 → Ubicación)</b> para encontrar los más cercanos.\n\n` +
+    `🏥 <b>Módulo Centros de Salud — La Paz</b>\n\n` +
+    `<blockquote><b>Descripción del módulo:</b>\n` +
+    `Directorio georreferenciado real de hospitales, clínicas, centros médicos y farmacias en <b>La Paz</b> basado en <b>OpenStreetMap</b>.\n\n` +
+    `Muestra dirección, teléfono/horario cuando están disponibles y enlace directo a <b>Google Maps</b>. También puedes escribir <code>/salud Obrero</code> o enviar tu <b>ubicación GPS (📎 → Ubicación)</b> para ordenar los más cercanos.</blockquote>\n\n` +
     `⬇️ <b>Elige un tipo de establecimiento:</b>`;
 
   const replyMarkup: ReplyMarkup = {
@@ -382,8 +384,8 @@ async function resolveAction(params: {
     return handleSaludCommand({ nearLat: location.latitude, nearLon: location.longitude });
   }
 
-  // Menús y submenús
-  if (cmd === '/start' || callbackData === 'menu_home') {
+  // Menús y submenús principales (4 sectores)
+  if (cmd === '/start' || cmd === '/help' || callbackData === 'menu_home' || callbackData === 'menu_help') {
     return buildMainMenu(firstName);
   }
   if (cmd === '/sicoes' || callbackData === 'menu_sicoes') {
@@ -396,30 +398,18 @@ async function resolveAction(params: {
     return buildSaludMenu();
   }
 
-  if (cmd === '/help' || callbackData === 'menu_help') {
-    return {
-      text:
-        `❓ <b>Guía de Comandos</b>\n\n` +
-        `<b>🏛️ SICOES La Paz:</b>\n` +
-        `• <code>/sicoes</code> — Menú interactivo de licitaciones\n` +
-        `• <code>/buscar &lt;texto&gt;</code> — Búsqueda semántica pgvector\n` +
-        `• <code>/vigentes</code> | <code>/cerradas</code> | <code>/recientes</code>\n` +
-        `• <code>/cuce &lt;código&gt;</code> — Ficha completa de convocatoria\n` +
-        `• <code>/entidades_top</code> | <code>/hubs_authorities</code> | <code>/stats</code>\n\n` +
-        `<b>🛒 Canasta Familiar (OAP):</b>\n` +
-        `• <code>/canasta</code> — Menú por categorías\n` +
-        `• <code>/canasta papa</code> — Buscar precio de producto\n\n` +
-        `<b>🏥 Centros de Salud (OSM):</b>\n` +
-        `• <code>/salud</code> — Menú por tipo\n` +
-        `• <code>/salud hospital</code> o envía tu 📍 ubicación GPS`,
-      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
-    };
-  }
-
   // Hints interactivos para comandos con parámetros
   if (callbackData === 'sicoes_buscar_hint') {
     return {
       text: `🔍 <b>Búsqueda Semántica en SICOES</b>\n\nEscribe directamente lo que buscas o usa:\n<code>/buscar medicamentos insumos hospital</code>\n<code>/buscar electrificacion obras</code>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+    };
+  }
+  if (callbackData === 'sicoes_cuce_hint') {
+    const sample = await getConvocatorias({ limit: 1 });
+    const sampleCuce = sample[0]?.cuce || '26-XXXX-00-XXXXXXX-1-1';
+    return {
+      text: `🆔 <b>Consultar Ficha Oficial por CUCE</b>\n\nEnvía <code>/cuce</code> seguido del código CUCE de la convocatoria.\n\n📌 <b>Ejemplo real en base:</b>\n<code>/cuce ${escHtml(sampleCuce)}</code>`,
       replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
     };
   }
@@ -601,7 +591,7 @@ async function resolveAction(params: {
         `🟢 Vigentes: ${metrics.vigentes} | 🔵 Adj.: ${metrics.adjudicadas} | 🤝 Contr.: ${metrics.contratadas} | ⚪ Des.: ${metrics.desiertas}\n` +
         `🕸️ <b>Grafo:</b> ${metrics.totalNodosGrafo} nodos • ${metrics.totalAristasGrafo} aristas (<code>${metrics.graphDensity} Δ</code>)\n` +
         `💬 <b>Consultas Usage Mining:</b> ${metrics.totalConsultasTelegram}`,
-      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+      replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
     };
   }
 

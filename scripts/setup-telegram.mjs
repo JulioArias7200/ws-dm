@@ -28,17 +28,10 @@ function loadTelegramToken() {
 }
 
 const COMMANDS = [
-  { command: 'start', description: 'Menú principal interactivo' },
-  { command: 'sicoes', description: 'Menú SICOES (Licitaciones La Paz)' },
-  { command: 'canasta', description: 'Precios Canasta Familiar (OAP La Paz)' },
-  { command: 'salud', description: 'Centros de Salud georreferenciados' },
-  { command: 'buscar', description: 'Búsqueda semántica pgvector en SICOES' },
-  { command: 'vigentes', description: 'Licitaciones abiertas vigentes' },
-  { command: 'cerradas', description: 'Adjudicadas, contratadas o desiertas' },
-  { command: 'cuce', description: 'Ficha oficial por código CUCE' },
-  { command: 'entidades_top', description: 'Ranking PageRank de entidades y rubros' },
-  { command: 'hubs_authorities', description: 'Análisis HITS (Hubs vs Authorities)' },
-  { command: 'stats', description: 'Estadísticas en vivo de Neon DB' },
+  { command: 'start', description: 'Información del bot y guía de comandos' },
+  { command: 'sicoes', description: 'Módulo SICOES: licitaciones La Paz e IA' },
+  { command: 'canasta', description: 'Módulo Canasta Familiar (precios OAP)' },
+  { command: 'salud', description: 'Módulo Centros de Salud y GPS (La Paz)' },
 ];
 
 async function tgCall(token, method, body) {

@@ -140,7 +140,7 @@ export default function TelemetriaPage() {
           </h2>
         </div>
         <p className="text-[13px] text-[#414753]">
-          Prueba el Webhook de Telegram enviando comandos (ej. <code>/vigentes</code>, <code>/cerradas</code>, <code>/entidades_top</code> o cualquier búsqueda semántica).
+          Prueba los 4 sectores principales del bot (<code>/start</code>, <code>/sicoes</code>, <code>/canasta</code>, <code>/salud</code>) o envía consultas directas con parámetros.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -148,11 +148,11 @@ export default function TelemetriaPage() {
             '/start',
             '/sicoes',
             '/canasta',
-            '/canasta papa',
             '/salud',
-            '/salud hospital',
+            '/buscar medicamentos',
             '/vigentes',
-            '/cerradas',
+            '/canasta papa',
+            '/salud hospital',
             '/entidades_top',
             '/stats',
           ].map((cmdBtn) => (
