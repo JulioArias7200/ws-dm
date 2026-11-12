@@ -190,9 +190,16 @@ export function computeGraphMining(
   const maxPossibleEdges = N > 1 ? N * (N - 1) : 1;
   const density = Number((edges.length / maxPossibleEdges).toFixed(4));
 
+  const entityNodes = nodes.filter((n) => n.type === 'Entidad');
+  const rubroNodes = nodes.filter((n) => n.type === 'Rubro');
+
   const sortedPR = [...nodes].sort((a, b) => b.pageRank - a.pageRank);
-  const sortedHubs = [...nodes].sort((a, b) => b.hubScore - a.hubScore);
-  const sortedAuth = [...nodes].sort((a, b) => b.authorityScore - a.authorityScore);
+  const sortedHubs = [...(entityNodes.length ? entityNodes : nodes)].sort(
+    (a, b) => b.hubScore - a.hubScore || b.outDegree - a.outDegree
+  );
+  const sortedAuth = [...(rubroNodes.length ? rubroNodes : nodes)].sort(
+    (a, b) => b.authorityScore - a.authorityScore || b.inDegree - a.inDegree
+  );
 
   return {
     nodes,

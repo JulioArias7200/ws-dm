@@ -1,9 +1,80 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { getDashboardMetrics } from '@/lib/db';
 
-export default async function HomePage() {
+async function DashboardKpis() {
   const metrics = await getDashboardMetrics();
 
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
+          <span>Convocatorias Indexadas</span>
+          <span className="material-symbols-outlined text-[#005cb8]">layers</span>
+        </div>
+        <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
+          {metrics.totalConvocatorias}
+        </div>
+        <div className="flex items-center gap-2 mt-3 text-[12px] text-emerald-600 font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>{metrics.vigentes} vigentes en La Paz</span>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
+          <span>
+            {metrics.montoTotalLicitado > 0 ? 'Monto Total Licitado' : 'Procesos Cerrados'}
+          </span>
+          <span className="material-symbols-outlined text-[#005cb8]">
+            {metrics.montoTotalLicitado > 0 ? 'payments' : 'inventory_2'}
+          </span>
+        </div>
+        <div className="text-2xl font-bold text-[#181c22] mt-2 font-mono truncate">
+          {metrics.montoTotalLicitado > 0
+            ? `Bs ${metrics.montoTotalLicitado.toLocaleString('es-BO')}`
+            : `${metrics.adjudicadas + metrics.contratadas + metrics.desiertas}`}
+        </div>
+        <div className="flex items-center gap-2 mt-3 text-[12px] text-[#414753]">
+          <span>
+            {metrics.montoTotalLicitado > 0
+              ? `Adjudicado: Bs ${metrics.montoAdjudicado.toLocaleString('es-BO')}`
+              : `${metrics.adjudicadas} adj. • ${metrics.contratadas} contr. • ${metrics.desiertas} des.`}
+          </span>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
+          <span>Nodos del Grafo (Red)</span>
+          <span className="material-symbols-outlined text-[#005cb8]">account_tree</span>
+        </div>
+        <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
+          {metrics.totalNodosGrafo}
+        </div>
+        <div className="flex items-center gap-2 mt-3 text-[12px] text-[#005cb8] font-medium">
+          <span>{metrics.totalAristasGrafo} aristas • {metrics.graphDensity} Δ densidad</span>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
+          <span>Consultas en Telegram</span>
+          <span className="material-symbols-outlined text-[#005cb8]">forum</span>
+        </div>
+        <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
+          {metrics.totalConsultasTelegram}
+        </div>
+        <div className="flex items-center gap-2 mt-3 text-[12px] text-emerald-600 font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Usage Mining Activo</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function HomePage() {
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
       {/* Banner de Bienvenida y Propósito */}
@@ -19,7 +90,7 @@ export default async function HomePage() {
             Sistema de Inteligencia de Contrataciones Estatales
           </h1>
           <p className="text-white/90 text-[15px] max-w-2xl">
-            Plataforma que integra <strong>Web Content Mining</strong> (Playwright), <strong>Web Structure Mining</strong> (PageRank & HITS), base de datos vectorial <strong>PostgreSQL (pgvector)</strong> y consulta ciudadana 24/7 vía <strong>Telegram</strong>.
+            Plataforma que integra <strong>Web Content Mining</strong> (SICOES), <strong>Web Structure Mining</strong> (PageRank & HITS), base de datos vectorial <strong>PostgreSQL (pgvector)</strong> y consulta ciudadana 24/7 vía <strong>Telegram</strong>.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -38,62 +109,18 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* Grid de KPIs Principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
-            <span>Convocatorias Indexadas</span>
-            <span className="material-symbols-outlined text-[#005cb8]">layers</span>
+      {/* Grid de KPIs Principales desde Neon PostgreSQL */}
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm h-32 animate-pulse" />
+            ))}
           </div>
-          <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
-            {metrics.totalConvocatorias}
-          </div>
-          <div className="flex items-center gap-2 mt-3 text-[12px] text-emerald-600 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>{metrics.vigentes} vigentes en La Paz</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
-            <span>Monto Total Licitado</span>
-            <span className="material-symbols-outlined text-[#005cb8]">payments</span>
-          </div>
-          <div className="text-2xl font-bold text-[#181c22] mt-2 font-mono truncate">
-            Bs {metrics.montoTotalLicitado.toLocaleString('es-BO')}
-          </div>
-          <div className="flex items-center gap-2 mt-3 text-[12px] text-[#414753]">
-            <span>Adjudicado: Bs {metrics.montoAdjudicado.toLocaleString('es-BO')}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
-            <span>Nodos del Grafo (Red)</span>
-            <span className="material-symbols-outlined text-[#005cb8]">account_tree</span>
-          </div>
-          <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
-            {metrics.totalNodosGrafo}
-          </div>
-          <div className="flex items-center gap-2 mt-3 text-[12px] text-[#005cb8] font-medium">
-            <span>{metrics.totalAristasGrafo} aristas • {metrics.graphDensity} Δ densidad</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
-            <span>Consultas en Telegram</span>
-            <span className="material-symbols-outlined text-[#005cb8]">forum</span>
-          </div>
-          <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
-            {metrics.totalConsultasTelegram}
-          </div>
-          <div className="flex items-center gap-2 mt-3 text-[12px] text-emerald-600 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Usage Mining Activo</span>
-          </div>
-        </div>
-      </div>
+        }
+      >
+        <DashboardKpis />
+      </Suspense>
 
       {/* Accesos a las 4 Interfaces Especializadas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -44,6 +44,7 @@ export default function TelemetriaPage() {
 
     try {
       const simulatedUpdate = {
+        simulate: true,
         update_id: Date.now(),
         message: {
           message_id: 101,
@@ -60,9 +61,12 @@ export default function TelemetriaPage() {
         body: JSON.stringify(simulatedUpdate),
       });
 
-      if (res.ok) {
-        setTestResponse(`✅ Petición procesada por el Webhook de Telegram. La consulta "${testQuery}" ha sido indexada en Web Usage Mining.`);
-        // Recargar logs
+      const payload = await res.json();
+      if (res.ok && payload.ok) {
+        setTestResponse(
+          payload.reply ||
+            `✅ Petición procesada por el Webhook de Telegram y registrada en Web Usage Mining.`
+        );
         const refresh = await fetch('/api/scraper-status');
         const d = await refresh.json();
         if (d.recentTelegramLogs) setLogs(d.recentTelegramLogs);
@@ -75,6 +79,12 @@ export default function TelemetriaPage() {
       setTesting(false);
     }
   };
+
+  const avgLatency =
+    logs.length > 0
+      ? Math.round(logs.reduce((sum, l) => sum + (l.response_time_ms || 0), 0) / logs.length)
+      : 0;
+  const topQuery = logs[0]?.query_text || 'Sin consultas aún';
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
@@ -104,20 +114,20 @@ export default function TelemetriaPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-xl border border-[#e0e2eb] shadow-sm">
           <div className="text-[11px] font-mono text-[#717785] uppercase">Total Consultas Registradas</div>
-          <div className="text-3xl font-bold text-[#181c22] mt-1 font-mono">{logs.length + 24}</div>
-          <div className="text-[11px] text-emerald-600 mt-2 font-medium">↑ 18% esta semana</div>
+          <div className="text-3xl font-bold text-[#181c22] mt-1 font-mono">{logs.length}</div>
+          <div className="text-[11px] text-emerald-600 mt-2 font-medium">Persistido en Neon PostgreSQL</div>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-[#e0e2eb] shadow-sm">
           <div className="text-[11px] font-mono text-[#717785] uppercase">Latencia Promedio Webhook</div>
-          <div className="text-3xl font-bold text-[#005cb8] mt-1 font-mono">175 ms</div>
+          <div className="text-3xl font-bold text-[#005cb8] mt-1 font-mono">{avgLatency} ms</div>
           <div className="text-[11px] text-[#717785] mt-2">Vercel Serverless Edge</div>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-[#e0e2eb] shadow-sm">
-          <div className="text-[11px] font-mono text-[#717785] uppercase">Término Más Frecuente</div>
-          <div className="text-[18px] font-bold text-[#181c22] mt-1 truncate">PostgreSQL & DBA</div>
-          <div className="text-[11px] text-[#717785] mt-2">Área: Tecnología La Paz</div>
+          <div className="text-[11px] font-mono text-[#717785] uppercase">Última Consulta Registrada</div>
+          <div className="text-[18px] font-bold text-[#181c22] mt-1 truncate">{topQuery}</div>
+          <div className="text-[11px] text-[#717785] mt-2">Bot @ChatDM7200bot • La Paz</div>
         </div>
       </div>
 
@@ -130,15 +140,40 @@ export default function TelemetriaPage() {
           </h2>
         </div>
         <p className="text-[13px] text-[#414753]">
-          Prueba el Webhook de Telegram enviando comandos (ej. <code>/vigentes</code>, <code>/entidades_top</code> o cualquier búsqueda semántica).
+          Prueba el Webhook de Telegram enviando comandos (ej. <code>/vigentes</code>, <code>/cerradas</code>, <code>/entidades_top</code> o cualquier búsqueda semántica).
         </p>
+
+        <div className="flex flex-wrap gap-2">
+          {[
+            '/start',
+            '/sicoes',
+            '/canasta',
+            '/canasta papa',
+            '/salud',
+            '/salud hospital',
+            '/vigentes',
+            '/cerradas',
+            '/entidades_top',
+            '/stats',
+          ].map((cmdBtn) => (
+              <button
+                key={cmdBtn}
+                type="button"
+                onClick={() => setTestQuery(cmdBtn)}
+                className="px-2.5 py-1 rounded-lg bg-[#f1f3fc] text-[#005cb8] text-[12px] font-mono hover:bg-[#e0e6f8] transition-colors"
+              >
+                {cmdBtn}
+              </button>
+            )
+          )}
+        </div>
 
         <form onSubmit={handleTestBot} className="flex gap-3">
           <input
             type="text"
             value={testQuery}
             onChange={(e) => setTestQuery(e.target.value)}
-            placeholder="Escribe un comando o consulta (ej. /vigentes o 'busco auditoría de sistemas')..."
+            placeholder="Escribe un comando o consulta (ej. /vigentes o '/buscar medicamentos hospital')..."
             className="flex-1 px-4 py-2.5 bg-[#f8fafd] border border-[#e0e2eb] rounded-xl text-[14px] text-[#181c22] focus:outline-none focus:border-[#005cb8]"
           />
           <button
@@ -151,9 +186,9 @@ export default function TelemetriaPage() {
         </form>
 
         {testResponse && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-[13px] text-blue-900 font-mono">
+          <pre className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-[12px] text-blue-950 font-mono whitespace-pre-wrap leading-relaxed">
             {testResponse}
-          </div>
+          </pre>
         )}
       </div>
 

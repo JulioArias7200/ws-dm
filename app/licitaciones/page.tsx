@@ -6,17 +6,21 @@ interface Convocatoria {
   cuce: string;
   entidad: string;
   tipo_entidad: string;
+  tipo_contratacion?: string | null;
   objeto: string;
   modalidad: string;
   subasta: boolean;
   departamento: string;
-  monto_referencial_bs: number;
+  monto_referencial_bs: number | null;
   monto_adjudicado_bs: number | null;
   fecha_publicacion: string;
-  fecha_presentacion: string;
+  fecha_presentacion: string | null;
   fecha_adjudicacion: string | null;
-  estado: 'VIGENTE' | 'ADJUDICADA' | 'DESIERTA' | 'CANCELADA';
+  estado: string;
   adjudicatario: string | null;
+  formularios?: string | null;
+  contacto?: string | null;
+  normativa?: string | null;
   pliego_url: string;
   similitud_semantica?: number;
   pagerank_entidad?: number;
@@ -98,7 +102,7 @@ export default function LicitacionesPage() {
 
       {/* Píldoras de Filtro por Estado */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {['TODOS', 'VIGENTE', 'ADJUDICADA', 'DESIERTA'].map((est) => (
+        {['TODOS', 'VIGENTE', 'ADJUDICADA', 'CONTRATADA', 'DESIERTA'].map((est) => (
           <button
             key={est}
             onClick={() => setFilterEstado(est)}
@@ -158,9 +162,13 @@ export default function LicitacionesPage() {
 
               <div className="mt-4 pt-3 border-t border-[#f1f3fc] flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] text-[#717785] uppercase font-mono">Presupuesto</div>
-                  <div className="text-[15px] font-bold text-[#181c22] font-mono">
-                    Bs {Number(item.monto_referencial_bs).toLocaleString('es-BO')}
+                  <div className="text-[10px] text-[#717785] uppercase font-mono">
+                    {item.monto_referencial_bs != null ? 'Presupuesto' : 'Tipo'}
+                  </div>
+                  <div className="text-[14px] font-bold text-[#181c22] font-mono">
+                    {item.monto_referencial_bs != null
+                      ? `Bs ${Number(item.monto_referencial_bs).toLocaleString('es-BO')}`
+                      : item.tipo_contratacion || item.modalidad}
                   </div>
                 </div>
 
@@ -207,19 +215,25 @@ export default function LicitacionesPage() {
 
               <div className="grid grid-cols-2 gap-3 bg-[#f1f3fc] p-4 rounded-xl">
                 <div>
-                  <div className="text-[11px] font-mono text-[#717785] uppercase">Monto Referencial</div>
-                  <div className="text-[16px] font-bold text-[#181c22] font-mono">
-                    Bs {Number(selectedItem.monto_referencial_bs).toLocaleString('es-BO')}
+                  <div className="text-[11px] font-mono text-[#717785] uppercase">
+                    {selectedItem.monto_referencial_bs != null ? 'Monto Referencial' : 'Tipo Contratación'}
+                  </div>
+                  <div className="text-[15px] font-bold text-[#181c22] font-mono">
+                    {selectedItem.monto_referencial_bs != null
+                      ? `Bs ${Number(selectedItem.monto_referencial_bs).toLocaleString('es-BO')}`
+                      : selectedItem.tipo_contratacion || 'N/D'}
                   </div>
                 </div>
                 <div>
                   <div className="text-[11px] font-mono text-[#717785] uppercase">Modalidad</div>
-                  <div className="text-[14px] font-medium text-[#181c22]">{selectedItem.modalidad}</div>
+                  <div className="text-[14px] font-medium text-[#181c22]">
+                    {selectedItem.modalidad} {selectedItem.subasta ? '(Subasta)' : ''}
+                  </div>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
-                <div className="text-[12px] font-bold text-[#181c22]">Cronograma de Fechas Oficiales:</div>
+                <div className="text-[12px] font-bold text-[#181c22]">Cronograma y Detalles Oficiales:</div>
                 <div className="flex items-center justify-between p-3 rounded-lg border border-[#e0e2eb] text-[13px]">
                   <span className="text-[#414753]">Fecha Inicio (Publicación):</span>
                   <span className="font-mono font-medium">
@@ -229,9 +243,29 @@ export default function LicitacionesPage() {
                 <div className="flex items-center justify-between p-3 rounded-lg border border-[#e0e2eb] text-[13px] bg-amber-50/50">
                   <span className="text-amber-900 font-medium">Fecha Fin (Presentación Límite):</span>
                   <span className="font-mono font-bold text-amber-900">
-                    {new Date(selectedItem.fecha_presentacion).toLocaleString('es-BO')}
+                    {selectedItem.fecha_presentacion
+                      ? new Date(selectedItem.fecha_presentacion).toLocaleDateString('es-BO')
+                      : 'Sin fecha límite'}
                   </span>
                 </div>
+                {selectedItem.formularios && (
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[#e0e2eb] text-[13px]">
+                    <span className="text-[#414753]">Formularios SICOES:</span>
+                    <span className="font-mono font-medium">{selectedItem.formularios}</span>
+                  </div>
+                )}
+                {selectedItem.contacto && (
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[#e0e2eb] text-[13px] gap-4">
+                    <span className="text-[#414753] shrink-0">Contacto:</span>
+                    <span className="font-medium text-right">{selectedItem.contacto}</span>
+                  </div>
+                )}
+                {selectedItem.normativa && (
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-[#e0e2eb] text-[13px] gap-4">
+                    <span className="text-[#414753] shrink-0">Normativa:</span>
+                    <span className="font-medium text-right">{selectedItem.normativa}</span>
+                  </div>
+                )}
               </div>
 
               {selectedItem.adjudicatario && (

@@ -1,5 +1,6 @@
 -- ==============================================================================
 -- SICOES-MINER LA PAZ: ESQUEMA DE BASE DE DATOS (NEON POSTGRESQL + PGVECTOR)
+-- Solo definición estructural (DDL). Los datos se ingieren mediante Web Scraping real.
 -- ==============================================================================
 
 -- 1. Habilitar extensión vectorial en Neon PostgreSQL
@@ -8,53 +9,61 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- 2. Tabla Principal de Convocatorias (Web Content Mining + Embeddings)
 CREATE TABLE IF NOT EXISTS sicoes_convocatorias (
     cuce VARCHAR(60) PRIMARY KEY,              -- Código Único de Contrataciones Estatales
-    entidad VARCHAR(255) NOT NULL,             -- Ej: Ministerio de Obras Públicas, GAMLP
-    tipo_entidad VARCHAR(50) DEFAULT 'Entidad Estatal', -- 'Ministerio', 'Municipio', 'Empresa Pública'
+    entidad VARCHAR(255) NOT NULL,             -- Entidad pública convocante
+    tipo_entidad VARCHAR(50) DEFAULT 'Entidad Estatal', -- 'Ministerio', 'Municipio', 'Empresa Pública', etc.
+    tipo_contratacion VARCHAR(80),             -- 'Bienes', 'Obras', 'Servicios Generales', 'Consultoria'
     objeto TEXT NOT NULL,                      -- Objeto de contratación / descripción
-    modalidad VARCHAR(50) DEFAULT 'ANPE',      -- 'ANPE', 'Licitación Pública', 'CIL', 'Menor'
+    modalidad VARCHAR(50) DEFAULT 'ANPE',      -- 'ANPE', 'LP', 'CM', 'CND1', etc.
     subasta BOOLEAN DEFAULT FALSE,             -- ¿Con subasta electrónica?
     departamento VARCHAR(50) DEFAULT 'La Paz',
-    
-    -- Valores económicos
-    monto_referencial_bs NUMERIC(14, 2) NOT NULL DEFAULT 0.00, -- Presupuesto base en Bolivianos
-    monto_adjudicado_bs NUMERIC(14, 2),        -- Monto final de adjudicación (cerradas)
-    
+
+    -- Valores económicos (opcional si el listado público no incluye monto sin descarga de ficha)
+    monto_referencial_bs NUMERIC(14, 2),
+    monto_adjudicado_bs NUMERIC(14, 2),
+
     -- Fechas críticas del ciclo de vida
-    fecha_publicacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- FECHA DE INICIO
-    fecha_presentacion TIMESTAMP NOT NULL,     -- FECHA DE FIN / Límite de propuestas
-    fecha_adjudicacion TIMESTAMP,              -- Fecha de resolución de adjudicación
-    
-    -- Estado de la licitación
-    estado VARCHAR(40) NOT NULL DEFAULT 'VIGENTE', -- 'VIGENTE', 'ADJUDICADA', 'DESIERTA', 'CANCELADA'
-    adjudicatario VARCHAR(255),                -- Nombre del proveedor adjudicado (cerradas)
-    
-    -- Documentos oficiales
-    pliego_url TEXT,                           -- Enlace al DBC / Formulario 100 / TDR
-    formulario_500_url TEXT,                   -- Enlace a la adjudicación oficial
-    
-    -- Vector de Embedding para búsqueda semántica densa (NVIDIA NIM 1024 dims)
+    fecha_publicacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_presentacion TIMESTAMP,
+    fecha_adjudicacion TIMESTAMP,
+
+    -- Estado real de la licitación
+    estado VARCHAR(40) NOT NULL DEFAULT 'VIGENTE', -- 'VIGENTE', 'ADJUDICADA', 'CONTRATADA', 'DESIERTA', 'CANCELADA'
+    adjudicatario VARCHAR(255),
+
+    -- Metadatos adicionales públicos de SICOES
+    formularios VARCHAR(120),
+    contacto VARCHAR(255),
+    normativa VARCHAR(180),
+
+    -- Enlaces oficiales de referencia
+    pliego_url TEXT,
+    formulario_500_url TEXT,
+
+    -- Vector de Embedding para búsqueda semántica densa (NVIDIA NIM nv-embedqa-e5-v5, 1024 dims)
     embedding vector(1024),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices HNSW para búsqueda vectorial acelerada
-CREATE INDEX IF NOT EXISTS sicoes_embedding_hnsw_idx 
+-- Índice HNSW para búsqueda vectorial por similitud de coseno
+CREATE INDEX IF NOT EXISTS sicoes_embedding_hnsw_idx
 ON sicoes_convocatorias USING hnsw (embedding vector_cosine_ops);
 
--- Índices relacionales para consultas de alta velocidad
+-- Índices relacionales para filtros y consultas rápidas
 CREATE INDEX IF NOT EXISTS sicoes_estado_idx ON sicoes_convocatorias (estado);
 CREATE INDEX IF NOT EXISTS sicoes_fecha_pres_idx ON sicoes_convocatorias (fecha_presentacion);
 CREATE INDEX IF NOT EXISTS sicoes_entidad_idx ON sicoes_convocatorias (entidad);
+CREATE INDEX IF NOT EXISTS sicoes_departamento_idx ON sicoes_convocatorias (departamento);
 
 -- 3. Topología de Grafo (Web Structure Mining: PageRank & HITS)
 CREATE TABLE IF NOT EXISTS sicoes_graph_edges (
     id SERIAL PRIMARY KEY,
     source_node VARCHAR(255) NOT NULL,         -- Entidad convocante
-    target_node VARCHAR(255) NOT NULL,         -- Rubro / Área técnica o Proveedor
+    target_node VARCHAR(255) NOT NULL,         -- Rubro / Área técnica o Tipo de Contratación
     edge_type VARCHAR(50) NOT NULL DEFAULT 'CONVOCA_RUBRO', -- 'CONVOCA_RUBRO', 'ADJUDICA_A'
     weight FLOAT DEFAULT 1.0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT sicoes_graph_edges_uniq UNIQUE (source_node, target_node, edge_type)
 );
 
 CREATE TABLE IF NOT EXISTS sicoes_node_metrics (
@@ -79,25 +88,34 @@ CREATE TABLE IF NOT EXISTS sicoes_usage_logs (
     queried_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. Semilla inicial de datos para verificación inmediata (Datos Paceños Reales)
-INSERT INTO sicoes_convocatorias 
-(cuce, entidad, tipo_entidad, objeto, modalidad, monto_referencial_bs, fecha_publicacion, fecha_presentacion, estado, pliego_url)
-VALUES
-('24-0412-00-149021-1-1', 'Ministerio de Planificación del Desarrollo', 'Ministerio', 'Servicio de Consultoría para Auditoría Forense Informática y Pentesting a la Infraestructura de Servidores del Sistema Nacional de Inversión Pública (SNIP)', 'ANPE con Subasta', 180000.00, '2026-11-01 09:00:00', '2026-11-20 18:00:00', 'VIGENTE', 'https://www.sicoes.gob.bo'),
-('24-0105-00-148810-1-1', 'Gobierno Autónomo Municipal de La Paz (GAMLP)', 'Municipio', 'Adquisición e Instalación de Red Dorsal de Fibra Óptica Monomodo y Enlaces Inalámbricos para el Centro de Monitoreo Urbano La Paz', 'Licitación Pública', 750000.00, '2026-10-25 10:00:00', '2026-11-18 16:30:00', 'VIGENTE', 'https://www.sicoes.gob.bo'),
-('24-0230-00-147900-1-2', 'Yacimientos Petrolíferos Fiscales Bolivianos (YPFB)', 'Empresa Pública', 'Servicio Especializado de Desarrollo de Software para el Módulo de Trazabilidad y Asignación de Combustibles en Plantas La Paz', 'ANPE', 240000.00, '2026-10-15 08:30:00', '2026-11-05 17:00:00', 'ADJUDICADA', 'https://www.sicoes.gob.bo'),
-('24-0012-00-146520-1-1', 'Universidad Mayor de San Andrés (UMSA)', 'Universidad', 'Consultoría de Línea para Especialista en Base de Datos PostgreSQL, Alta Disponibilidad y Migración de Sistemas Académicos', 'CIL', 72000.00, '2026-11-02 08:00:00', '2026-11-15 15:00:00', 'VIGENTE', 'https://www.sicoes.gob.bo'),
-('24-0550-00-145110-1-1', 'Ministerio de Salud y Deportes', 'Ministerio', 'Mantenimiento Preventivo y Correctivo de Servidores Centrales y Sistema Único de Información en Salud (SUIS) para La Paz', 'ANPE', 125000.00, '2026-09-20 09:00:00', '2026-10-10 18:00:00', 'DESIERTA', 'https://www.sicoes.gob.bo')
-ON CONFLICT (cuce) DO NOTHING;
+-- 5. Precios Reales de Canasta Familiar (Observatorio Agroambiental OAP Bolivia)
+CREATE TABLE IF NOT EXISTS canasta_precios (
+    id SERIAL PRIMARY KEY,
+    fecha DATE NOT NULL,
+    departamento VARCHAR(50) NOT NULL,
+    producto VARCHAR(180) NOT NULL,
+    categoria VARCHAR(60),
+    unidad_medida VARCHAR(50) NOT NULL,
+    precio_bs NUMERIC(10, 2) NOT NULL,
+    fuente VARCHAR(120) DEFAULT 'OAP Bolivia',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT canasta_precios_uniq UNIQUE (fecha, departamento, producto)
+);
 
--- Aristas iniciales del grafo de contrataciones
-INSERT INTO sicoes_graph_edges (source_node, target_node, edge_type, weight)
-VALUES
-('Ministerio de Planificación del Desarrollo', 'Auditoría Forense & Ciberseguridad', 'CONVOCA_RUBRO', 1.0),
-('Gobierno Autónomo Municipal de La Paz (GAMLP)', 'Fibra Óptica & Telecomunicaciones', 'CONVOCA_RUBRO', 1.0),
-('Yacimientos Petrolíferos Fiscales Bolivianos (YPFB)', 'Desarrollo de Software', 'CONVOCA_RUBRO', 1.0),
-('Universidad Mayor de San Andrés (UMSA)', 'Bases de Datos & DBA', 'CONVOCA_RUBRO', 1.0),
-('Ministerio de Salud y Deportes', 'Infraestructura & Servidores', 'CONVOCA_RUBRO', 1.0),
-('Gobierno Autónomo Municipal de La Paz (GAMLP)', 'Desarrollo de Software', 'CONVOCA_RUBRO', 1.0),
-('Ministerio de Planificación del Desarrollo', 'Bases de Datos & DBA', 'CONVOCA_RUBRO', 1.0)
-ON CONFLICT DO NOTHING;
+CREATE INDEX IF NOT EXISTS canasta_depto_fecha_idx ON canasta_precios (departamento, fecha DESC);
+
+-- 6. Centros de Salud Georreferenciados en La Paz (OpenStreetMap)
+CREATE TABLE IF NOT EXISTS centros_salud (
+    osm_id VARCHAR(60) PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    tipo VARCHAR(40) NOT NULL,
+    departamento VARCHAR(50) DEFAULT 'La Paz',
+    direccion TEXT,
+    lat DOUBLE PRECISION NOT NULL,
+    lon DOUBLE PRECISION NOT NULL,
+    telefono VARCHAR(100),
+    horario VARCHAR(180),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS centros_salud_tipo_idx ON centros_salud (tipo);

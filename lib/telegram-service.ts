@@ -1,6 +1,22 @@
 import { hybridSearch, getConvocatorias, getConvocatoriaByCuce, getDashboardMetrics, logUsage } from './db';
+import {
+  getCanastaPrecios,
+  compareCanastaEje,
+  syncCanastaOapToNeon,
+  searchCentrosSalud,
+} from './canasta-salud';
 import { askLlama } from './nvidia-ai';
 import { getAppConfig } from './config';
+
+export interface InlineKeyboardButton {
+  text: string;
+  callback_data?: string;
+  url?: string;
+}
+
+export interface ReplyMarkup {
+  inline_keyboard: InlineKeyboardButton[][];
+}
 
 export interface TelegramUpdate {
   update_id: number;
@@ -20,202 +36,789 @@ export interface TelegramUpdate {
     };
     date: number;
     text?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      username?: string;
+    };
+    message?: {
+      message_id: number;
+      chat: {
+        id: number;
+        type: string;
+      };
+    };
+    data?: string;
+  };
+}
+
+export interface BotReply {
+  chatId: number;
+  messageId?: number;
+  text: string;
+  plainText: string;
+  replyMarkup?: ReplyMarkup;
+}
+
+export const TELEGRAM_COMMANDS_MENU = [
+  { command: 'start', description: 'Menú principal interactivo' },
+  { command: 'sicoes', description: 'Menú SICOES (Licitaciones La Paz)' },
+  { command: 'canasta', description: 'Precios Canasta Familiar (OAP La Paz)' },
+  { command: 'salud', description: 'Centros de Salud georreferenciados' },
+  { command: 'buscar', description: 'Búsqueda semántica pgvector en SICOES' },
+  { command: 'vigentes', description: 'Licitaciones abiertas vigentes' },
+  { command: 'cerradas', description: 'Adjudicadas, contratadas o desiertas' },
+  { command: 'cuce', description: 'Ficha oficial por código CUCE' },
+  { command: 'entidades_top', description: 'Ranking PageRank de entidades y rubros' },
+  { command: 'hubs_authorities', description: 'Análisis HITS (Hubs vs Authorities)' },
+  { command: 'stats', description: 'Estadísticas en vivo de Neon DB' },
+];
+
+const BACK_TO_HOME_ROW: InlineKeyboardButton[] = [{ text: '⬅️ Menú Principal', callback_data: 'menu_home' }];
+const BACK_TO_SICOES_ROW: InlineKeyboardButton[] = [
+  { text: '⬅️ SICOES', callback_data: 'menu_sicoes' },
+  { text: '🏠 Menú', callback_data: 'menu_home' },
+];
+const BACK_TO_CANASTA_ROW: InlineKeyboardButton[] = [
+  { text: '⬅️ Canasta', callback_data: 'menu_canasta' },
+  { text: '🏠 Menú', callback_data: 'menu_home' },
+];
+const BACK_TO_SALUD_ROW: InlineKeyboardButton[] = [
+  { text: '⬅️ Salud', callback_data: 'menu_salud' },
+  { text: '🏠 Menú', callback_data: 'menu_home' },
+];
+
+function escHtml(text: unknown): string {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<a href="([^"]+)">([^<]+)<\/a>/gi, '$2 ($1)')
+    .replace(/<\/?(?:b|strong|i|em|code|pre|blockquote)>/gi, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function parseCommand(rawText: string): { cmd: string | null; args: string } {
+  const trimmed = rawText.trim();
+  if (!trimmed.startsWith('/')) {
+    return { cmd: null, args: trimmed };
+  }
+  const spaceIdx = trimmed.search(/\s/);
+  const head = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
+  const args = spaceIdx === -1 ? '' : trimmed.slice(spaceIdx + 1).trim();
+  const cmd = head.split('@')[0].toLowerCase();
+  return { cmd, args };
+}
+
+function formatDateBo(iso: string | null | undefined, fallback = 'Por confirmar'): string {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return fallback;
+  return d.toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function buildMainMenu(firstName: string): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🏛️ <b>SICOES-Miner La Paz</b> ✨\n` +
+    `<i>Inteligencia Web, Canasta Familiar y Centros de Salud</i>\n\n` +
+    `Hola <b>${escHtml(firstName || 'Ciudadano')}</b> 👋\n\n` +
+    `<blockquote>🏛️ <b>SICOES</b> — Licitaciones reales, pgvector y PageRank\n` +
+    `🛒 <b>Canasta Familiar</b> — Precios oficiales OAP en La Paz\n` +
+    `🏥 <b>Centros de Salud</b> — Hospitales, clínicas y farmacias GPS\n` +
+    `📊 <b>Telemetría</b> — Métricas en vivo y minería de uso</blockquote>\n\n` +
+    `⬇️ <b>Elige un módulo abajo:</b>`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [{ text: '🏛️ SICOES — Licitaciones La Paz', callback_data: 'menu_sicoes' }],
+      [
+        { text: '🛒 Canasta Familiar', callback_data: 'menu_canasta' },
+        { text: '🏥 Centros de Salud', callback_data: 'menu_salud' },
+      ],
+      [
+        { text: '📊 Estadísticas', callback_data: 'sicoes_stats' },
+        { text: '❓ Comandos / Ayuda', callback_data: 'menu_help' },
+      ],
+      [{ text: '🌐 Abrir Plataforma Web', url: 'https://ws-dm.vercel.app' }],
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+function buildSicoesMenu(): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🏛️ <b>Menú SICOES — La Paz</b>\n\n` +
+    `<blockquote>Consulta convocatorias reales extraídas de <code>sicoes.gob.bo</code>, ranking PageRank / HITS y búsqueda semántica vectorial en <code>pgvector</code>.</blockquote>\n\n` +
+    `⬇️ <b>Selecciona una acción:</b>`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🟢 Vigentes', callback_data: 'sicoes_vigentes' },
+        { text: '🔴 Cerradas', callback_data: 'sicoes_cerradas' },
+      ],
+      [
+        { text: '🆕 Recientes', callback_data: 'sicoes_recientes' },
+        { text: '🔍 Buscar con IA', callback_data: 'sicoes_buscar_hint' },
+      ],
+      [
+        { text: '🏆 Top PageRank', callback_data: 'sicoes_entidades' },
+        { text: '🌟 Hubs & Auth', callback_data: 'sicoes_hits' },
+      ],
+      [
+        { text: '🏗️ Obras', callback_data: 'sicoes_rubro_Obras' },
+        { text: '📦 Bienes', callback_data: 'sicoes_rubro_Bienes' },
+        { text: '🛠️ Servicios', callback_data: 'sicoes_rubro_Servicios' },
+      ],
+      BACK_TO_HOME_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+function buildCanastaMenu(): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🛒 <b>Menú Canasta Familiar — La Paz</b>\n\n` +
+    `<blockquote>Precios referenciales diarios reales del <b>Observatorio Agroambiental y Productivo (OAP Bolivia)</b> en mercados de La Paz y comparación con el Eje Troncal.</blockquote>\n\n` +
+    `💡 <i>También puedes escribir:</i> <code>/canasta papa</code> o <code>/canasta pollo</code>\n\n` +
+    `⬇️ <b>Elige una categoría:</b>`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🥔 Verduras y Tubérculos', callback_data: 'canasta_cat_verduras' },
+        { text: '🍗 Carnes y Huevo', callback_data: 'canasta_cat_carnes' },
+      ],
+      [
+        { text: '🌾 Arroz, Aceite y Frutas', callback_data: 'canasta_cat_abarrotes' },
+        { text: '📈 Comparar La Paz/CBBA/SCZ', callback_data: 'canasta_comparar' },
+      ],
+      [
+        { text: '🔄 Actualizar OAP', callback_data: 'canasta_sync' },
+        { text: '🔎 Cómo buscar', callback_data: 'canasta_buscar_hint' },
+      ],
+      BACK_TO_HOME_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+function buildSaludMenu(): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🏥 <b>Menú Centros de Salud — La Paz</b>\n\n` +
+    `<blockquote>Directorio georreferenciado real de hospitales, clínicas y farmacias en <b>La Paz</b> vía <b>OpenStreetMap</b>, con coordenadas y ruta directa en Google Maps.</blockquote>\n\n` +
+    `💡 <i>Tip:</i> Escribe <code>/salud Obrero</code> o envía tu <b>ubicación GPS (📎 → Ubicación)</b> para encontrar los más cercanos.\n\n` +
+    `⬇️ <b>Elige un tipo de establecimiento:</b>`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🏥 Hospitales La Paz', callback_data: 'salud_tipo_hospital' },
+        { text: '🩺 Clínicas y Postas', callback_data: 'salud_tipo_clinic' },
+      ],
+      [
+        { text: '💊 Farmacias La Paz', callback_data: 'salud_tipo_pharmacy' },
+        { text: '📍 Buscar por Zona / GPS', callback_data: 'salud_buscar_hint' },
+      ],
+      BACK_TO_HOME_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+async function handleCanastaCommand(
+  args: string,
+  action?: string
+): Promise<{ text: string; replyMarkup: ReplyMarkup }> {
+  if (action === 'canasta_sync') {
+    const sync = await syncCanastaOapToNeon();
+    return {
+      text: `🔄 <b>Precios OAP actualizados en Neon PostgreSQL</b>\n\n📦 Registros procesados: <b>${sync.inserted}</b>\n📅 Última fecha oficial: <b>${escHtml(sync.latestDate || 'Hoy')}</b>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
+    };
+  }
+
+  if (action === 'canasta_comparar') {
+    const comp = await compareCanastaEje();
+    if (comp.length === 0) {
+      return { text: `🛒 No hay datos comparativos disponibles.`, replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] } };
+    }
+    const lines = comp
+      .map(
+        (c) =>
+          `• <b>${escHtml(c.producto)}</b> (${escHtml(c.unidad)})\n` +
+          `  LPZ: <b>${c.laPaz != null ? `Bs ${c.laPaz.toFixed(2)}` : '-'}</b> | CBBA: ${c.cbba != null ? `Bs ${c.cbba.toFixed(2)}` : '-'} | SCZ: ${c.scz != null ? `Bs ${c.scz.toFixed(2)}` : '-'}`
+      )
+      .join('\n');
+    return {
+      text: `📈 <b>Comparativa Eje Troncal — OAP (${escHtml(comp[0].fecha)})</b>\n\n${lines}`,
+      replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
+    };
+  }
+
+  let categoria: string | undefined;
+  let title = '🛒 <b>Precios Canasta Familiar — La Paz (OAP)</b>';
+  if (action === 'canasta_cat_verduras') {
+    categoria = 'Verduras y Tubérculos';
+    title = '🥔 <b>Verduras y Tubérculos — La Paz</b>';
+  } else if (action === 'canasta_cat_carnes') {
+    categoria = 'Carnes y Huevo';
+    title = '🍗 <b>Carnes y Huevo — La Paz</b>';
+  } else if (action === 'canasta_cat_abarrotes') {
+    categoria = 'Abarrotes y Frutas';
+    title = '🌾 <b>Abarrotes y Frutas — La Paz</b>';
+  }
+
+  const items = await getCanastaPrecios({
+    categoria,
+    query: args || undefined,
+    departamento: 'LA PAZ',
+    limit: 12,
+  });
+
+  if (items.length === 0) {
+    return {
+      text: `🔎 No se encontraron precios en La Paz para <i>"${escHtml(args)}"</i>.\nPrueba con <code>/canasta papa</code>, <code>/canasta arroz</code> o <code>/canasta pollo</code>.`,
+      replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
+    };
+  }
+
+  const list = items
+    .map(
+      (p) =>
+        `• <b>${escHtml(p.producto)}</b>\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)} <i>(${escHtml(p.fecha)})</i>`
+    )
+    .join('\n');
+
+  return {
+    text: `${title}\n\n${list}`,
+    replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
+  };
+}
+
+async function handleSaludCommand(options: {
+  tipo?: string;
+  query?: string;
+  nearLat?: number;
+  nearLon?: number;
+}): Promise<{ text: string; replyMarkup: ReplyMarkup }> {
+  const items = await searchCentrosSalud({ ...options, limit: 6 });
+
+  if (items.length === 0) {
+    return {
+      text: `🏥 No se encontraron centros de salud con ese criterio en La Paz.\nIntenta con <code>/salud hospital</code>, <code>/salud Miraflores</code> o envía tu ubicación GPS.`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+    };
+  }
+
+  const tipoEmoji: Record<string, string> = {
+    hospital: '🏥',
+    clinic: '🩺',
+    pharmacy: '💊',
+    doctors: '👨‍⚕️',
+  };
+
+  const title =
+    options.nearLat != null
+      ? `📍 <b>Centros de Salud Más Cercanos a tu Ubicación</b>`
+      : options.tipo === 'hospital'
+      ? `🏥 <b>Hospitales en La Paz (OSM)</b>`
+      : options.tipo === 'clinic'
+      ? `🩺 <b>Clínicas y Postas en La Paz (OSM)</b>`
+      : options.tipo === 'pharmacy'
+      ? `💊 <b>Farmacias en La Paz (OSM)</b>`
+      : `🏥 <b>Resultados de Salud — La Paz</b>`;
+
+  const list = items
+    .map((c) => {
+      const mapsUrl = `https://maps.google.com/?q=${c.lat},${c.lon}`;
+      const icon = tipoEmoji[c.tipo] || '🏥';
+      const dist = c.distancia_km != null ? ` — <b>${c.distancia_km} km</b>` : '';
+      return (
+        `${icon} <b>${escHtml(c.nombre)}</b>${dist}\n` +
+        (c.direccion ? `   📍 ${escHtml(c.direccion)}\n` : '') +
+        (c.telefono ? `   📞 ${escHtml(c.telefono)}\n` : '') +
+        (c.horario ? `   🕒 ${escHtml(c.horario)}\n` : '') +
+        `   🗺️ <a href="${mapsUrl}">Abrir en Google Maps</a>`
+      );
+    })
+    .join('\n\n');
+
+  return {
+    text: `${title}\n\n${list}`,
+    replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+  };
+}
+
+async function resolveAction(params: {
+  cmd: string | null;
+  args: string;
+  callbackData?: string;
+  firstName: string;
+  location?: { latitude: number; longitude: number };
+}): Promise<{ text: string; replyMarkup?: ReplyMarkup; matchedCuce?: string }> {
+  const { cmd, args, callbackData, firstName, location } = params;
+
+  // Ubicación GPS enviada directamente -> buscar centros de salud cercanos
+  if (location) {
+    return handleSaludCommand({ nearLat: location.latitude, nearLon: location.longitude });
+  }
+
+  // Menús y submenús
+  if (cmd === '/start' || callbackData === 'menu_home') {
+    return buildMainMenu(firstName);
+  }
+  if (cmd === '/sicoes' || callbackData === 'menu_sicoes') {
+    return buildSicoesMenu();
+  }
+  if ((cmd === '/canasta' && !args) || callbackData === 'menu_canasta') {
+    return buildCanastaMenu();
+  }
+  if ((cmd === '/salud' && !args) || callbackData === 'menu_salud') {
+    return buildSaludMenu();
+  }
+
+  if (cmd === '/help' || callbackData === 'menu_help') {
+    return {
+      text:
+        `❓ <b>Guía de Comandos</b>\n\n` +
+        `<b>🏛️ SICOES La Paz:</b>\n` +
+        `• <code>/sicoes</code> — Menú interactivo de licitaciones\n` +
+        `• <code>/buscar &lt;texto&gt;</code> — Búsqueda semántica pgvector\n` +
+        `• <code>/vigentes</code> | <code>/cerradas</code> | <code>/recientes</code>\n` +
+        `• <code>/cuce &lt;código&gt;</code> — Ficha completa de convocatoria\n` +
+        `• <code>/entidades_top</code> | <code>/hubs_authorities</code> | <code>/stats</code>\n\n` +
+        `<b>🛒 Canasta Familiar (OAP):</b>\n` +
+        `• <code>/canasta</code> — Menú por categorías\n` +
+        `• <code>/canasta papa</code> — Buscar precio de producto\n\n` +
+        `<b>🏥 Centros de Salud (OSM):</b>\n` +
+        `• <code>/salud</code> — Menú por tipo\n` +
+        `• <code>/salud hospital</code> o envía tu 📍 ubicación GPS`,
+      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+    };
+  }
+
+  // Hints interactivos para comandos con parámetros
+  if (callbackData === 'sicoes_buscar_hint') {
+    return {
+      text: `🔍 <b>Búsqueda Semántica en SICOES</b>\n\nEscribe directamente lo que buscas o usa:\n<code>/buscar medicamentos insumos hospital</code>\n<code>/buscar electrificacion obras</code>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+    };
+  }
+  if (callbackData === 'canasta_buscar_hint') {
+    return {
+      text: `🔎 <b>Buscar Precio en Canasta Familiar</b>\n\nEscribe <code>/canasta</code> seguido del producto:\n• <code>/canasta arroz</code>\n• <code>/canasta pollo</code>\n• <code>/canasta aceite</code>\n• <code>/canasta papa</code>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
+    };
+  }
+  if (callbackData === 'salud_buscar_hint') {
+    return {
+      text: `📍 <b>Buscar Centros de Salud Cercanos</b>\n\n1. Envía tu <b>ubicación GPS</b> (clip 📎 → Ubicación) para calcular distancia exacta.\n2. O escribe por nombre/zona:\n• <code>/salud Obrero</code>\n• <code>/salud Miraflores</code>\n• <code>/salud farmacia</code>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+    };
+  }
+
+  // Acciones Canasta Familiar
+  if (callbackData?.startsWith('canasta_') || cmd === '/canasta') {
+    return handleCanastaCommand(args, callbackData);
+  }
+
+  // Acciones Centros de Salud
+  if (callbackData?.startsWith('salud_') || cmd === '/salud') {
+    const tipo = callbackData?.startsWith('salud_tipo_')
+      ? callbackData.replace('salud_tipo_', '')
+      : undefined;
+    return handleSaludCommand({ tipo, query: args || undefined });
+  }
+
+  // Acciones SICOES
+  if (cmd === '/vigentes' || callbackData === 'sicoes_vigentes') {
+    const items = await getConvocatorias({ estado: 'VIGENTE', limit: 4 });
+    if (items.length === 0) {
+      return { text: `🟢 No hay licitaciones VIGENTE registradas.`, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
+    }
+    let text = `🟢 <b>Licitaciones VIGENTES en La Paz (${items.length}):</b>\n\n`;
+    for (const item of items) {
+      text +=
+        `📄 <code>${escHtml(item.cuce)}</code>\n` +
+        `🏢 ${escHtml(item.entidad)}\n` +
+        `🏷️ ${escHtml(item.tipo_contratacion || item.modalidad)} | 📅 ${formatDateBo(item.fecha_publicacion)} → ⏳ ${formatDateBo(item.fecha_presentacion)}\n` +
+        `📝 ${escHtml(item.objeto.slice(0, 105))}${item.objeto.length > 105 ? '...' : ''}\n` +
+        `🔗 <a href="${escHtml(item.pliego_url)}">Ver Ficha SICOES</a>\n\n`;
+    }
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] }, matchedCuce: items[0]?.cuce };
+  }
+
+  if (cmd === '/cerradas' || callbackData === 'sicoes_cerradas') {
+    const argLower = args.toLowerCase();
+    let estados = ['ADJUDICADA', 'CONTRATADA', 'DESIERTA'];
+    if (argLower.includes('adjudic')) estados = ['ADJUDICADA'];
+    else if (argLower.includes('contrat')) estados = ['CONTRATADA'];
+    else if (argLower.includes('desiert')) estados = ['DESIERTA'];
+
+    const items = await getConvocatorias({ estados, limit: 5 });
+    if (items.length === 0) {
+      return { text: `🔴 No se encontraron procesos cerrados.`, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
+    }
+    let text = `🔴 <b>Procesos CERRADOS en La Paz (${items.length}):</b>\n\n`;
+    for (const item of items) {
+      text +=
+        `📄 <code>${escHtml(item.cuce)}</code> [<b>${escHtml(item.estado)}</b>]\n` +
+        `🏢 ${escHtml(item.entidad)}\n` +
+        `📝 ${escHtml(item.objeto.slice(0, 105))}${item.objeto.length > 105 ? '...' : ''}\n\n`;
+    }
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] }, matchedCuce: items[0]?.cuce };
+  }
+
+  if (cmd === '/recientes' || callbackData === 'sicoes_recientes') {
+    const items = await getConvocatorias({ limit: 5 });
+    let text = `🆕 <b>Últimas Convocatorias (La Paz):</b>\n\n`;
+    for (const item of items) {
+      text +=
+        `• <code>${escHtml(item.cuce)}</code> — <b>${escHtml(item.estado)}</b>\n` +
+        `  ${escHtml(item.entidad)}\n` +
+        `  <i>${escHtml(item.objeto.slice(0, 90))}${item.objeto.length > 90 ? '...' : ''}</i>\n\n`;
+    }
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] }, matchedCuce: items[0]?.cuce };
+  }
+
+  if (cmd === '/rubro' || callbackData?.startsWith('sicoes_rubro_')) {
+    const rubroArg = callbackData?.startsWith('sicoes_rubro_')
+      ? callbackData.replace('sicoes_rubro_', '')
+      : args;
+    if (!rubroArg) {
+      return {
+        text: `⚠️ Indica un rubro. Ejemplo: <code>/rubro obras</code> o <code>/rubro medicamentos</code>`,
+        replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+      };
+    }
+    const items = await getConvocatorias({ tipoContratacion: rubroArg, limit: 4 });
+    if (items.length === 0) {
+      return { text: `🔎 Sin resultados para rubro <i>"${escHtml(rubroArg)}"</i>.`, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
+    }
+    let text = `🏷️ <b>Convocatorias "${escHtml(rubroArg)}" (${items.length}):</b>\n\n`;
+    for (const item of items) {
+      text +=
+        `📄 <code>${escHtml(item.cuce)}</code> [<b>${escHtml(item.estado)}</b>]\n` +
+        `🏢 ${escHtml(item.entidad)}\n` +
+        `📝 ${escHtml(item.objeto.slice(0, 105))}${item.objeto.length > 105 ? '...' : ''}\n` +
+        `🔗 <a href="${escHtml(item.pliego_url)}">Ver Ficha</a>\n\n`;
+    }
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] }, matchedCuce: items[0]?.cuce };
+  }
+
+  if (cmd === '/cuce') {
+    const cuceTarget = args.split(/\s+/)[0];
+    if (!cuceTarget) {
+      return {
+        text: `⚠️ Indica un CUCE. Ejemplo: <code>/cuce 26-1262-00-1708614-1-1</code>`,
+        replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+      };
+    }
+    const item = await getConvocatoriaByCuce(cuceTarget);
+    if (!item) {
+      return {
+        text: `❌ No se encontró el CUCE <code>${escHtml(cuceTarget)}</code>.`,
+        replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+      };
+    }
+    const montoStr =
+      item.monto_referencial_bs != null
+        ? `Bs ${Number(item.monto_referencial_bs).toLocaleString('es-BO')}`
+        : 'Ver Ficha PDF SICOES';
+    return {
+      matchedCuce: item.cuce,
+      text:
+        `📋 <b>FICHA OFICIAL SICOES</b>\n\n` +
+        `🆔 <b>CUCE:</b> <code>${escHtml(item.cuce)}</code>\n` +
+        `🏛️ <b>Entidad:</b> ${escHtml(item.entidad)}\n` +
+        `📌 <b>Estado:</b> <b>${escHtml(item.estado)}</b>\n` +
+        `🏷️ <b>Tipo / Modalidad:</b> ${escHtml(item.tipo_contratacion || '-')} / ${escHtml(item.modalidad)}\n` +
+        `💰 <b>Monto:</b> ${escHtml(montoStr)}\n` +
+        `📅 <b>Publicación:</b> ${formatDateBo(item.fecha_publicacion)} | ⏰ <b>Límite:</b> ${formatDateBo(item.fecha_presentacion, 'N/D')}\n` +
+        (item.formularios ? `📑 <b>Formularios:</b> ${escHtml(item.formularios)}\n` : '') +
+        (item.contacto ? `📞 <b>Contacto:</b> ${escHtml(item.contacto)}\n` : '') +
+        `\n📝 <b>Objeto:</b>\n${escHtml(item.objeto)}\n\n` +
+        `🌐 <a href="${escHtml(item.pliego_url)}">Abrir Ficha Oficial</a>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+    };
+  }
+
+  if (cmd === '/entidades_top' || callbackData === 'sicoes_entidades') {
+    const metrics = await getDashboardMetrics();
+    let text = `🏆 <b>Top Entidades y Rubros PageRank (La Paz):</b>\n\n`;
+    text += `🏛️ <b>Entidades Convocantes (Hub Score):</b>\n`;
+    metrics.topHubs.slice(0, 5).forEach((node, idx) => {
+      text += `${idx + 1}. <b>${escHtml(node.label)}</b> — Hub: <code>${node.hubScore}</code>\n`;
+    });
+    text += `\n🎯 <b>Rubros por PageRank (d=0.85):</b>\n`;
+    metrics.topPageRank
+      .filter((n) => n.type === 'Rubro')
+      .slice(0, 5)
+      .forEach((node, idx) => {
+        text += `${idx + 1}. <b>${escHtml(node.label)}</b> — PR: <code>${node.pageRank}</code>\n`;
+      });
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
+  }
+
+  if (cmd === '/hubs_authorities' || callbackData === 'sicoes_hits') {
+    const metrics = await getDashboardMetrics();
+    let text = `🌟 <b>Análisis HITS de Kleinberg:</b>\n\n🏢 <b>Top Hubs (Entidades):</b>\n`;
+    metrics.topHubs.slice(0, 4).forEach((n, i) => {
+      text += `${i + 1}. ${escHtml(n.label)} (<code>${n.hubScore}</code>)\n`;
+    });
+    text += `\n🎯 <b>Top Authorities (Rubros):</b>\n`;
+    metrics.topAuthorities.slice(0, 4).forEach((n, i) => {
+      text += `${i + 1}. ${escHtml(n.label)} (<code>${n.authorityScore}</code>)\n`;
+    });
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
+  }
+
+  if (cmd === '/stats' || callbackData === 'sicoes_stats') {
+    const metrics = await getDashboardMetrics();
+    return {
+      text:
+        `📊 <b>Estadísticas en Vivo (Neon PostgreSQL):</b>\n\n` +
+        `📂 <b>Convocatorias SICOES:</b> ${metrics.totalConvocatorias}\n` +
+        `🟢 Vigentes: ${metrics.vigentes} | 🔵 Adj.: ${metrics.adjudicadas} | 🤝 Contr.: ${metrics.contratadas} | ⚪ Des.: ${metrics.desiertas}\n` +
+        `🕸️ <b>Grafo:</b> ${metrics.totalNodosGrafo} nodos • ${metrics.totalAristasGrafo} aristas (<code>${metrics.graphDensity} Δ</code>)\n` +
+        `💬 <b>Consultas Usage Mining:</b> ${metrics.totalConsultasTelegram}`,
+      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+    };
+  }
+
+  if (cmd !== null && cmd !== '/buscar') {
+    return {
+      text: `❓ Comando <code>${escHtml(cmd)}</code> no reconocido. Usa <code>/start</code> para abrir el menú.`,
+      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+    };
+  }
+
+  // Búsqueda semántica pgvector (/buscar <texto> o mensaje libre)
+  const querySearch = cmd === '/buscar' ? args : params.args;
+  if (!querySearch) {
+    return {
+      text: `🔍 Escribe qué quieres buscar. Ejemplo: <code>/buscar medicamentos hospital</code>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+    };
+  }
+
+  const results = await hybridSearch(querySearch, undefined, { limit: 3 });
+  if (results.length === 0) {
+    return {
+      text: `🔍 No se encontraron licitaciones para <i>"${escHtml(querySearch)}"</i>.\nPrueba también <code>/canasta ${escHtml(querySearch)}</code> o <code>/salud ${escHtml(querySearch)}</code>.`,
+      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+    };
+  }
+
+  const contextForLlama = results
+    .map(
+      (r) =>
+        `- CUCE: ${r.cuce} | Entidad: ${r.entidad} | Estado: ${r.estado} | Tipo: ${r.tipo_contratacion || r.modalidad} | Fin: ${formatDateBo(r.fecha_presentacion, 'N/D')} | Objeto: ${r.objeto}`
+    )
+    .join('\n');
+
+  const llamaSummary = await askLlama(querySearch, contextForLlama);
+  const listHtml = results
+    .map(
+      (r) =>
+        `• <code>${escHtml(r.cuce)}</code> [<b>${escHtml(r.estado)}</b>] (${((r.similitud_semantica || 0) * 100).toFixed(1)}% cos)\n  ${escHtml(r.entidad)} — <a href="${escHtml(r.pliego_url)}">Ficha</a>`
+    )
+    .join('\n');
+
+  return {
+    matchedCuce: results[0]?.cuce,
+    text:
+      `🎯 <b>Resultados SICOES pgvector:</b> <i>"${escHtml(querySearch)}"</i>\n\n` +
+      `${escHtml(llamaSummary)}\n\n` +
+      `📌 <b>Coincidencias:</b>\n${listHtml}`,
+    replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
   };
 }
 
 /**
- * Procesa un mensaje entrante de Telegram y devuelve la respuesta
+ * Procesa mensajes de texto, comandos y ubicaciones GPS entrantes
  */
-export async function processTelegramMessage(update: TelegramUpdate): Promise<{ chatId: number; text: string }> {
+export async function processTelegramMessage(update: TelegramUpdate): Promise<BotReply> {
   const startTime = Date.now();
   const msg = update.message;
 
-  if (!msg || !msg.text) {
-    return { chatId: 0, text: '' };
+  if (!msg || (!msg.text && !msg.location)) {
+    return { chatId: 0, text: '', plainText: '' };
   }
 
   const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const username = msg.from.username || msg.from.first_name;
-  const rawText = msg.text.trim();
+  const userId = msg.from?.id;
+  const username = msg.from?.username || msg.from?.first_name || 'usuario';
+  const firstName = msg.from?.first_name || username;
+  const rawText = msg.text?.trim() || (msg.location ? `[GPS ${msg.location.latitude},${msg.location.longitude}]` : '');
+  const { cmd, args } = parseCommand(msg.text || '');
 
-  let responseText = '';
-  let matchedCuce: string | undefined = undefined;
-
+  let result: { text: string; replyMarkup?: ReplyMarkup; matchedCuce?: string };
   try {
-    // 1. Comando /start o /help
-    if (rawText === '/start' || rawText === '/help') {
-      responseText = `🏛️ **¡Bienvenido a SICOES-Miner La Paz!**\n\n` +
-        `Sistema inteligente de minería web, búsqueda semántica y seguimiento de contrataciones del Estado en La Paz.\n\n` +
-        `📌 **Comandos Disponibles:**\n` +
-        `🔍 \`/buscar <términos>\` - Búsqueda semántica por perfil o rubro (ej. \`/buscar bases de datos postgresql\`).\n` +
-        `🟢 \`/vigentes\` - Licitaciones abiertas con fecha límite próxima.\n` +
-        `🔴 \`/cerradas\` - Histórico de licitaciones adjudicadas o desiertas.\n` +
-        `📋 \`/cuce <codigo>\` - Ficha completa de una convocatoria oficial.\n` +
-        `🏆 \`/entidades_top\` - Ranking de instituciones públicas según **PageRank**.\n` +
-        `🌟 \`/hubs_authorities\` - Análisis **HITS** (Grandes Contratadores vs Rubros Clave).\n` +
-        `📊 \`/stats\` - Estadísticas de uso y telemetría en tiempo real.\n\n` +
-        `💡 *También puedes escribir directamente en lenguaje natural qué trabajo o licitación buscas.*`;
-    }
-    // 2. Comando /vigentes
-    else if (rawText === '/vigentes') {
-      const items = await getConvocatorias({ estado: 'VIGENTE', limit: 4 });
-      responseText = `🟢 **Licitaciones VIGENTES en La Paz (${items.length} encontradas):**\n\n`;
-      for (const item of items) {
-        const fechaFin = new Date(item.fecha_presentacion).toLocaleDateString('es-BO', {
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        responseText += `📄 **CUCE:** \`${item.cuce}\`\n` +
-          `🏢 **Entidad:** ${item.entidad}\n` +
-          `💰 **Presupuesto:** Bs ${Number(item.monto_referencial_bs).toLocaleString('es-BO')}\n` +
-          `⏳ **Límite:** ${fechaFin}\n` +
-          `📝 **Objeto:** ${item.objeto.slice(0, 110)}...\n` +
-          `🔗 [Ver Pliego SICOES](${item.pliego_url})\n\n`;
-      }
-    }
-    // 3. Comando /cerradas
-    else if (rawText === '/cerradas') {
-      const items = await getConvocatorias({ estado: 'ADJUDICADA', limit: 3 });
-      responseText = `🔴 **Licitaciones CERRADAS / ADJUDICADAS Recientes:**\n\n`;
-      for (const item of items) {
-        responseText += `📄 **CUCE:** \`${item.cuce}\`\n` +
-          `🏢 **Entidad:** ${item.entidad}\n` +
-          `🏆 **Adjudicado a:** ${item.adjudicatario || 'Empresa Adjudicada'}\n` +
-          `💵 **Monto Final:** Bs ${Number(item.monto_adjudicado_bs || item.monto_referencial_bs).toLocaleString('es-BO')}\n` +
-          `📝 **Objeto:** ${item.objeto.slice(0, 100)}...\n\n`;
-      }
-    }
-    // 4. Comando /cuce <codigo>
-    else if (rawText.startsWith('/cuce')) {
-      const parts = rawText.split(/\s+/);
-      const cuceTarget = parts[1];
-      if (!cuceTarget) {
-        responseText = `⚠️ Por favor indica el código CUCE. Ejemplo: \`/cuce 24-0412-00-149021-1-1\``;
-      } else {
-        const item = await getConvocatoriaByCuce(cuceTarget);
-        if (!item) {
-          responseText = `❌ No se encontró ninguna convocatoria con el CUCE \`${cuceTarget}\`.`;
-        } else {
-          matchedCuce = item.cuce;
-          const pub = new Date(item.fecha_publicacion).toLocaleDateString('es-BO');
-          const pres = new Date(item.fecha_presentacion).toLocaleString('es-BO');
-          responseText = `📋 **FICHA TÉCNICA OFICIAL SICOES**\n\n` +
-            `🆔 **CUCE:** \`${item.cuce}\`\n` +
-            `🏛️ **Entidad:** ${item.entidad} (${item.tipo_entidad})\n` +
-            `📌 **Estado:** ${item.estado}\n` +
-            `🏷️ **Modalidad:** ${item.modalidad} ${item.subasta ? '(Con Subasta)' : ''}\n` +
-            `💰 **Monto Referencial:** Bs ${Number(item.monto_referencial_bs).toLocaleString('es-BO')}\n` +
-            `📅 **Fecha Inicio (Publicación):** ${pub}\n` +
-            `⏰ **Fecha Fin (Presentación):** ${pres}\n` +
-            `📝 **Objeto de Contratación:**\n${item.objeto}\n\n` +
-            (item.adjudicatario ? `🏆 **Ganador:** ${item.adjudicatario}\n` : '') +
-            `🌐 [Descargar Pliego DBC / Formulario 100](${item.pliego_url})`;
-        }
-      }
-    }
-    // 5. Comando /entidades_top (PageRank)
-    else if (rawText === '/entidades_top') {
-      const metrics = await getDashboardMetrics();
-      responseText = `🏆 **Top Entidades Estatales en La Paz (Ranking PageRank):**\n\n` +
-        `El algoritmo **PageRank (d=0.85)** pondera la solvencia, centralidad y volumen de publicación en la red estatal:\n\n`;
-      metrics.topPageRank.slice(0, 5).forEach((node, idx) => {
-        responseText += `${idx + 1}. **${node.label}**\n` +
-          `   ⭐ **PageRank:** \`${node.pageRank}\` | 📥 Entrantes: ${node.inDegree} | 📤 Salientes: ${node.outDegree}\n\n`;
-      });
-    }
-    // 6. Comando /hubs_authorities (HITS)
-    else if (rawText === '/hubs_authorities') {
-      const metrics = await getDashboardMetrics();
-      responseText = `🌟 **Análisis HITS de Kleinberg (Hubs vs Authorities):**\n\n` +
-        `🏢 **Top Hubs (Entidades Concentradoras de Licitaciones):**\n`;
-      metrics.topHubs.slice(0, 3).forEach((n, i) => {
-        responseText += `${i + 1}. ${n.label} (Score: \`${n.hubScore}\`)\n`;
-      });
-      responseText += `\n🎯 **Top Authorities (Rubros Profesionales Más Demandados):**\n`;
-      metrics.topAuthorities.slice(0, 3).forEach((n, i) => {
-        responseText += `${i + 1}. ${n.label} (Score: \`${n.authorityScore}\`)\n`;
-      });
-    }
-    // 7. Comando /stats
-    else if (rawText === '/stats') {
-      const metrics = await getDashboardMetrics();
-      responseText = `📊 **Estadísticas de Minería Web y Telemetría:**\n\n` +
-        `📂 **Total Convocatorias Indexadas:** ${metrics.totalConvocatorias}\n` +
-        `🟢 **Vigentes:** ${metrics.vigentes} | 🔴 **Adjudicadas:** ${metrics.adjudicadas}\n` +
-        `💵 **Monto Total Licitado:** Bs ${metrics.montoTotalLicitado.toLocaleString('es-BO')}\n` +
-        `🕸️ **Nodos en el Grafo:** ${metrics.totalNodosGrafo} | 🔗 **Aristas:** ${metrics.totalAristasGrafo}\n` +
-        `📈 **Densidad de la Red:** \`${metrics.graphDensity} Δ\`\n` +
-        `💬 **Consultas Ciudadanas Registradas:** ${metrics.totalConsultasTelegram}`;
-    }
-    // 8. Búsqueda Semántica Híbrida (por defecto o /buscar)
-    else {
-      const querySearch = rawText.startsWith('/buscar') ? rawText.replace('/buscar', '').trim() : rawText;
-      const results = await hybridSearch(querySearch, undefined, { limit: 3 });
-
-      if (results.length === 0) {
-        responseText = `🔍 No se encontraron licitaciones coincidentes con *"${querySearch}"*.\n\nIntenta con términos más generales como *sistemas, auditoría, consultoría o mantenimiento*.`;
-      } else {
-        matchedCuce = results[0]?.cuce;
-        const contextForLlama = results
-          .map(
-            (r) =>
-              `- CUCE: ${r.cuce} | Entidad: ${r.entidad} | Monto: Bs ${r.monto_referencial_bs} | Fin: ${new Date(r.fecha_presentacion).toLocaleDateString('es-BO')} | Objeto: ${r.objeto}`
-          )
-          .join('\n');
-
-        const llamaSummary = await askLlama(querySearch, contextForLlama);
-
-        responseText = `🎯 **Resultados para:** *"${querySearch}"*\n\n` +
-          `${llamaSummary}\n\n` +
-          `📌 *Tip: Usa \`/cuce <id>\` para ver el pliego completo o \`/vigentes\` para ver convocatorias abiertas.*`;
-      }
-    }
+    result = await resolveAction({
+      cmd,
+      args,
+      firstName,
+      location: msg.location,
+    });
   } catch (err) {
     console.error('[TELEGRAM SERVICE] Error procesando mensaje:', err);
-    responseText = `⚠️ Ocurrió un inconveniente al procesar tu solicitud. Por favor intenta de nuevo en unos momentos.`;
+    result = { text: '⚠️ Ocurrió un inconveniente al procesar tu solicitud. Intenta de nuevo.' };
   }
 
-  const duration = Date.now() - startTime;
+  let finalText = result.text;
+  if (finalText.length > 4000) finalText = finalText.slice(0, 3980) + '\n...';
 
-  // Registrar en Web Usage Mining
   await logUsage({
     telegram_user_id: userId,
     username,
     query_text: rawText,
-    matched_cuce: matchedCuce,
-    response_time_ms: duration,
+    matched_cuce: result.matchedCuce,
+    response_time_ms: Date.now() - startTime,
   });
 
-  return { chatId, text: responseText };
+  return {
+    chatId,
+    text: finalText,
+    plainText: htmlToPlainText(finalText),
+    replyMarkup: result.replyMarkup,
+  };
 }
 
 /**
- * Enviar mensaje directo a Telegram mediante HTTP API
+ * Procesa clics en botones del Inline Keyboard (`callback_query`)
  */
-export async function sendTelegramResponse(chatId: number, text: string): Promise<boolean> {
+export async function processTelegramCallback(update: TelegramUpdate): Promise<BotReply> {
+  const startTime = Date.now();
+  const cb = update.callback_query;
+  if (!cb || !cb.message || !cb.data) {
+    return { chatId: 0, text: '', plainText: '' };
+  }
+
+  const chatId = cb.message.chat.id;
+  const messageId = cb.message.message_id;
+  const firstName = cb.from?.first_name || cb.from?.username || 'Usuario';
+  const username = cb.from?.username || firstName;
+
+  let result: { text: string; replyMarkup?: ReplyMarkup; matchedCuce?: string };
+  try {
+    result = await resolveAction({
+      cmd: null,
+      args: '',
+      callbackData: cb.data,
+      firstName,
+    });
+  } catch (err) {
+    console.error('[TELEGRAM SERVICE] Error procesando callback:', err);
+    result = { text: '⚠️ Error al abrir esa sección.', replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] } };
+  }
+
+  let finalText = result.text;
+  if (finalText.length > 4000) finalText = finalText.slice(0, 3980) + '\n...';
+
+  await logUsage({
+    telegram_user_id: cb.from?.id,
+    username,
+    query_text: `[btn:${cb.data}]`,
+    matched_cuce: result.matchedCuce,
+    response_time_ms: Date.now() - startTime,
+  });
+
+  return {
+    chatId,
+    messageId,
+    text: finalText,
+    plainText: htmlToPlainText(finalText),
+    replyMarkup: result.replyMarkup,
+  };
+}
+
+export async function answerCallbackQuery(callbackQueryId: string): Promise<void> {
+  const { telegramBotToken } = getAppConfig();
+  if (!telegramBotToken || !callbackQueryId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${telegramBotToken}/answerCallbackQuery`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(5000),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId }),
+    });
+  } catch {}
+}
+
+/**
+ * Envía mensaje nuevo o edita el mensaje existente en Telegram con Inline Keyboard
+ */
+export async function sendTelegramResponse(
+  chatId: number,
+  text: string,
+  replyMarkup?: ReplyMarkup,
+  editMessageId?: number
+): Promise<boolean> {
   const { telegramBotToken } = getAppConfig();
   if (!telegramBotToken || !chatId) return false;
 
-  const url = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+  const method = editMessageId ? 'editMessageText' : 'sendMessage';
+  const url = `https://api.telegram.org/bot${telegramBotToken}/${method}`;
+  const payload: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...(editMessageId ? { message_id: editMessageId } : {}),
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  };
 
   try {
     const res = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) return true;
+
+    const errTxt = await res.text();
+    // Si Telegram dice "message is not modified", considerarlo válido
+    if (errTxt.includes('message is not modified')) return true;
+
+    console.warn(`[TELEGRAM SERVICE] HTTP ${res.status} en ${method}:`, errTxt);
+
+    // Fallback a sendMessage en texto plano
+    const fallbackRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
-        parse_mode: 'Markdown',
+        text: htmlToPlainText(text),
         disable_web_page_preview: true,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
     });
-    return res.ok;
+    return fallbackRes.ok;
   } catch (err) {
-    console.warn('[TELEGRAM SERVICE] Error al enviar mensaje a Telegram (posible sandbox offline):', err);
+    console.warn('[TELEGRAM SERVICE] Error enviando respuesta a Telegram:', err);
     return false;
   }
 }
-

@@ -1,21 +1,26 @@
 import { getAppConfig } from './config';
-import { computeGraphMining, SEED_GRAPH_EDGES, GraphEdge } from './graph-mining';
+import { computeGraphMining, GraphEdge } from './graph-mining';
+import { generateEmbedding } from './nvidia-ai';
 
 export interface Convocatoria {
   cuce: string;
   entidad: string;
   tipo_entidad: string;
+  tipo_contratacion?: string | null;
   objeto: string;
   modalidad: string;
   subasta: boolean;
   departamento: string;
-  monto_referencial_bs: number;
+  monto_referencial_bs: number | null;
   monto_adjudicado_bs: number | null;
   fecha_publicacion: string;
-  fecha_presentacion: string;
+  fecha_presentacion: string | null;
   fecha_adjudicacion: string | null;
-  estado: 'VIGENTE' | 'ADJUDICADA' | 'DESIERTA' | 'CANCELADA';
+  estado: string;
   adjudicatario: string | null;
+  formularios?: string | null;
+  contacto?: string | null;
+  normativa?: string | null;
   pliego_url: string;
   formulario_500_url: string | null;
   similitud_semantica?: number;
@@ -33,287 +38,424 @@ export interface UsageLog {
   queried_at?: string;
 }
 
-// Almacén en memoria de respaldo para garantizar funcionamiento offline y tests
-const memoryConvocatorias: Convocatoria[] = [
-  {
-    cuce: '24-0412-00-149021-1-1',
-    entidad: 'Ministerio de Planificación del Desarrollo',
-    tipo_entidad: 'Ministerio',
-    objeto: 'Servicio de Consultoría para Auditoría Forense Informática y Pentesting a la Infraestructura de Servidores del Sistema Nacional de Inversión Pública (SNIP)',
-    modalidad: 'ANPE con Subasta',
-    subasta: true,
-    departamento: 'La Paz',
-    monto_referencial_bs: 180000.0,
-    monto_adjudicado_bs: null,
-    fecha_publicacion: '2026-11-01T09:00:00Z',
-    fecha_presentacion: '2026-11-20T18:00:00Z',
-    fecha_adjudicacion: null,
-    estado: 'VIGENTE',
-    adjudicatario: null,
-    pliego_url: 'https://www.sicoes.gob.bo',
-    formulario_500_url: null,
-  },
-  {
-    cuce: '24-0105-00-148810-1-1',
-    entidad: 'Gobierno Autónomo Municipal de La Paz (GAMLP)',
-    tipo_entidad: 'Municipio',
-    objeto: 'Adquisición e Instalación de Red Dorsal de Fibra Óptica Monomodo y Enlaces Inalámbricos para el Centro de Monitoreo Urbano La Paz',
-    modalidad: 'Licitación Pública',
-    subasta: false,
-    departamento: 'La Paz',
-    monto_referencial_bs: 750000.0,
-    monto_adjudicado_bs: null,
-    fecha_publicacion: '2026-10-25T10:00:00Z',
-    fecha_presentacion: '2026-11-18T16:30:00Z',
-    fecha_adjudicacion: null,
-    estado: 'VIGENTE',
-    adjudicatario: null,
-    pliego_url: 'https://www.sicoes.gob.bo',
-    formulario_500_url: null,
-  },
-  {
-    cuce: '24-0230-00-147900-1-2',
-    entidad: 'Yacimientos Petrolíferos Fiscales Bolivianos (YPFB)',
-    tipo_entidad: 'Empresa Pública',
-    objeto: 'Servicio Especializado de Desarrollo de Software para el Módulo de Trazabilidad y Asignación de Combustibles en Plantas La Paz',
-    modalidad: 'ANPE',
-    subasta: false,
-    departamento: 'La Paz',
-    monto_referencial_bs: 240000.0,
-    monto_adjudicado_bs: 235000.0,
-    fecha_publicacion: '2026-10-15T08:30:00Z',
-    fecha_presentacion: '2026-11-05T17:00:00Z',
-    fecha_adjudicacion: '2026-11-08T14:00:00Z',
-    estado: 'ADJUDICADA',
-    adjudicatario: 'Sistemas & Redes Andinas S.R.L.',
-    pliego_url: 'https://www.sicoes.gob.bo',
-    formulario_500_url: 'https://www.sicoes.gob.bo/formulario500',
-  },
-  {
-    cuce: '24-0012-00-146520-1-1',
-    entidad: 'Universidad Mayor de San Andrés (UMSA)',
-    tipo_entidad: 'Universidad',
-    objeto: 'Consultoría de Línea para Especialista en Base de Datos PostgreSQL, Alta Disponibilidad y Migración de Sistemas Académicos',
-    modalidad: 'CIL',
-    subasta: false,
-    departamento: 'La Paz',
-    monto_referencial_bs: 72000.0,
-    monto_adjudicado_bs: null,
-    fecha_publicacion: '2026-11-02T08:00:00Z',
-    fecha_presentacion: '2026-11-15T15:00:00Z',
-    fecha_adjudicacion: null,
-    estado: 'VIGENTE',
-    adjudicatario: null,
-    pliego_url: 'https://www.sicoes.gob.bo',
-    formulario_500_url: null,
-  },
-  {
-    cuce: '24-0550-00-145110-1-1',
-    entidad: 'Ministerio de Salud y Deportes',
-    tipo_entidad: 'Ministerio',
-    objeto: 'Mantenimiento Preventivo y Correctivo de Servidores Centrales y Sistema Único de Información en Salud (SUIS) para La Paz',
-    modalidad: 'ANPE',
-    subasta: false,
-    departamento: 'La Paz',
-    monto_referencial_bs: 125000.0,
-    monto_adjudicado_bs: null,
-    fecha_publicacion: '2026-09-20T09:00:00Z',
-    fecha_presentacion: '2026-10-10T18:00:00Z',
-    fecha_adjudicacion: null,
-    estado: 'DESIERTA',
-    adjudicatario: null,
-    pliego_url: 'https://www.sicoes.gob.bo',
-    formulario_500_url: null,
-  },
-];
-
-const memoryUsageLogs: UsageLog[] = [
-  {
-    id: 1,
-    telegram_user_id: 1049281,
-    username: 'carlos_lp',
-    query_text: 'consultoria bases de datos postgresql',
-    matched_cuce: '24-0012-00-146520-1-1',
-    response_time_ms: 142,
-    queried_at: new Date(Date.now() - 15 * 60000).toISOString(),
-  },
-  {
-    id: 2,
-    telegram_user_id: 882931,
-    username: 'rodrigo_dev',
-    query_text: 'auditoria forense seguridad informatica',
-    matched_cuce: '24-0412-00-149021-1-1',
-    response_time_ms: 210,
-    queried_at: new Date(Date.now() - 45 * 60000).toISOString(),
-  },
-  {
-    id: 3,
-    telegram_user_id: 294012,
-    username: 'mariana_arq',
-    query_text: 'fibra optica telecomunicaciones La Paz',
-    matched_cuce: '24-0105-00-148810-1-1',
-    response_time_ms: 185,
-    queried_at: new Date(Date.now() - 120 * 60000).toISOString(),
-  },
-];
-
-const memoryGraphEdges: GraphEdge[] = [...SEED_GRAPH_EDGES];
+interface NeonSqlResponse<T = Record<string, unknown>> {
+  rows?: T[];
+  rowCount?: number;
+}
 
 /**
- * Consulta de convocatorias con filtros
+ * Ejecuta una sentencia SQL parametrizada contra Neon Serverless PostgreSQL (/sql)
+ */
+export async function neonQuery<T = Record<string, unknown>>(
+  query: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  const { neonDatabaseUrl } = getAppConfig();
+  if (!neonDatabaseUrl) {
+    throw new Error('NEON_DB no está configurada en .env');
+  }
+
+  const parsed = new URL(neonDatabaseUrl);
+  const res = await fetch(`https://${parsed.hostname}/sql`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(15000),
+    headers: {
+      'Content-Type': 'application/json',
+      'Neon-Connection-String': neonDatabaseUrl,
+    },
+    body: JSON.stringify({ query, params }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Neon SQL HTTP ${res.status}: ${errText}`);
+  }
+
+  const data = (await res.json()) as NeonSqlResponse<T>;
+  return data.rows || [];
+}
+
+function mapConvocatoriaRow(row: Record<string, unknown>): Convocatoria {
+  return {
+    cuce: String(row.cuce ?? ''),
+    entidad: String(row.entidad ?? ''),
+    tipo_entidad: String(row.tipo_entidad ?? 'Entidad Estatal'),
+    tipo_contratacion: row.tipo_contratacion != null ? String(row.tipo_contratacion) : null,
+    objeto: String(row.objeto ?? ''),
+    modalidad: String(row.modalidad ?? ''),
+    subasta: Boolean(row.subasta),
+    departamento: String(row.departamento ?? 'La Paz'),
+    monto_referencial_bs:
+      row.monto_referencial_bs != null ? Number(row.monto_referencial_bs) : null,
+    monto_adjudicado_bs:
+      row.monto_adjudicado_bs != null ? Number(row.monto_adjudicado_bs) : null,
+    fecha_publicacion: row.fecha_publicacion ? String(row.fecha_publicacion) : new Date().toISOString(),
+    fecha_presentacion: row.fecha_presentacion ? String(row.fecha_presentacion) : null,
+    fecha_adjudicacion: row.fecha_adjudicacion ? String(row.fecha_adjudicacion) : null,
+    estado: String(row.estado ?? 'VIGENTE'),
+    adjudicatario: row.adjudicatario != null ? String(row.adjudicatario) : null,
+    formularios: row.formularios != null ? String(row.formularios) : null,
+    contacto: row.contacto != null ? String(row.contacto) : null,
+    normativa: row.normativa != null ? String(row.normativa) : null,
+    pliego_url: String(row.pliego_url ?? 'https://www.sicoes.gob.bo'),
+    formulario_500_url: row.formulario_500_url != null ? String(row.formulario_500_url) : null,
+    similitud_semantica:
+      row.similitud_semantica != null ? Number(Number(row.similitud_semantica).toFixed(4)) : undefined,
+  };
+}
+
+/**
+ * Consulta de convocatorias reales en Neon PostgreSQL con filtros
  */
 export async function getConvocatorias(filters: {
   estado?: string;
+  estados?: string[];
+  tipoContratacion?: string;
   entidad?: string;
   limit?: number;
 } = {}): Promise<Convocatoria[]> {
-  let list = [...memoryConvocatorias];
+  try {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
 
-  if (filters.estado && filters.estado !== 'TODOS') {
-    list = list.filter((c) => c.estado === filters.estado);
+    if (filters.estados && filters.estados.length > 0) {
+      params.push(filters.estados);
+      conditions.push(`estado = ANY($${params.length}::text[])`);
+    } else if (filters.estado && filters.estado !== 'TODOS') {
+      params.push(filters.estado);
+      conditions.push(`estado = $${params.length}`);
+    }
+
+    if (filters.tipoContratacion) {
+      params.push(`%${filters.tipoContratacion}%`);
+      conditions.push(`(tipo_contratacion ILIKE $${params.length} OR objeto ILIKE $${params.length})`);
+    }
+
+    if (filters.entidad) {
+      params.push(`%${filters.entidad}%`);
+      conditions.push(`entidad ILIKE $${params.length}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limitVal = Math.min(Math.max(Number(filters.limit || 25), 1), 100);
+    params.push(limitVal);
+
+    const rows = await neonQuery(
+      `SELECT cuce, entidad, tipo_entidad, tipo_contratacion, objeto, modalidad, subasta,
+              departamento, monto_referencial_bs, monto_adjudicado_bs,
+              fecha_publicacion, fecha_presentacion, fecha_adjudicacion,
+              estado, adjudicatario, formularios, contacto, normativa,
+              pliego_url, formulario_500_url
+       FROM sicoes_convocatorias
+       ${whereClause}
+       ORDER BY fecha_publicacion DESC, updated_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    return rows.map(mapConvocatoriaRow);
+  } catch (err) {
+    console.warn('[DB] No se pudo consultar getConvocatorias en Neon:', err);
+    return [];
   }
-
-  if (filters.entidad) {
-    const term = filters.entidad.toLowerCase();
-    list = list.filter((c) => c.entidad.toLowerCase().includes(term));
-  }
-
-  if (filters.limit) {
-    list = list.slice(0, filters.limit);
-  }
-
-  return list;
 }
 
 /**
- * Búsqueda por CUCE
+ * Búsqueda por CUCE exacto en Neon PostgreSQL
  */
 export async function getConvocatoriaByCuce(cuce: string): Promise<Convocatoria | null> {
-  const item = memoryConvocatorias.find((c) => c.cuce === cuce);
-  return item || null;
+  try {
+    const rows = await neonQuery(
+      `SELECT cuce, entidad, tipo_entidad, tipo_contratacion, objeto, modalidad, subasta,
+              departamento, monto_referencial_bs, monto_adjudicado_bs,
+              fecha_publicacion, fecha_presentacion, fecha_adjudicacion,
+              estado, adjudicatario, formularios, contacto, normativa,
+              pliego_url, formulario_500_url
+       FROM sicoes_convocatorias
+       WHERE cuce = $1
+       LIMIT 1`,
+      [cuce]
+    );
+    return rows[0] ? mapConvocatoriaRow(rows[0]) : null;
+  } catch (err) {
+    console.warn('[DB] No se pudo consultar getConvocatoriaByCuce en Neon:', err);
+    return null;
+  }
 }
 
 /**
- * Búsqueda Híbrida: Vectorial (Similitud Coseno) + Prestigio PageRank de la Entidad
+ * Búsqueda Híbrida con pgvector (Similitud Coseno <=>) + Prestigio PageRank de la Entidad
  * Score = SimilitudCoseno * 0.7 + PageRank * 0.3
  */
 export async function hybridSearch(
   queryText: string,
-  _queryVector?: number[],
+  queryVector?: number[],
   options: { maxPrice?: number; estado?: string; limit?: number } = {}
 ): Promise<Convocatoria[]> {
-  const graphResult = computeGraphMining(memoryGraphEdges);
-  const prMap = new Map<string, number>();
-  graphResult.nodes.forEach((n) => prMap.set(n.id, n.pageRank));
+  try {
+    const vec = queryVector && queryVector.length === 1024 ? queryVector : await generateEmbedding(queryText);
+    const vecLiteral = `[${vec.join(',')}]`;
 
-  const words = queryText.toLowerCase().split(/\s+/).filter(Boolean);
+    const params: unknown[] = [vecLiteral];
+    const conditions = ['embedding IS NOT NULL'];
 
-  let results = memoryConvocatorias.map((c) => {
-    // Cálculo heurístico de similitud semántica basado en match de conceptos
-    let matchScore = 0.5;
-    const combinedText = `${c.objeto} ${c.entidad} ${c.modalidad}`.toLowerCase();
-
-    for (const w of words) {
-      if (combinedText.includes(w)) matchScore += 0.15;
+    if (options.estado && options.estado !== 'TODOS') {
+      params.push(options.estado);
+      conditions.push(`estado = $${params.length}`);
     }
-    matchScore = Math.min(matchScore, 0.98);
 
-    const pr = prMap.get(c.entidad) || 0.05;
-    const finalScore = Number((matchScore * 0.7 + pr * 0.3).toFixed(4));
+    if (options.maxPrice) {
+      params.push(options.maxPrice);
+      conditions.push(`(monto_referencial_bs IS NULL OR monto_referencial_bs <= $${params.length})`);
+    }
 
-    return {
-      ...c,
-      similitud_semantica: matchScore,
-      pagerank_entidad: pr,
-      score_hibrido: finalScore,
-    };
-  });
+    const fetchLimit = Math.min(Math.max(Number(options.limit || 10) * 3, 15), 60);
+    params.push(fetchLimit);
 
-  if (options.estado && options.estado !== 'TODOS') {
-    results = results.filter((c) => c.estado === options.estado);
+    const rows = await neonQuery(
+      `SELECT cuce, entidad, tipo_entidad, tipo_contratacion, objeto, modalidad, subasta,
+              departamento, monto_referencial_bs, monto_adjudicado_bs,
+              fecha_publicacion, fecha_presentacion, fecha_adjudicacion,
+              estado, adjudicatario, formularios, contacto, normativa,
+              pliego_url, formulario_500_url,
+              (1 - (embedding <=> $1::vector))::float AS similitud_semantica
+       FROM sicoes_convocatorias
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY embedding <=> $1::vector ASC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    const edges = await getGraphEdges();
+    const graphResult = computeGraphMining(edges);
+    const prMap = new Map<string, number>();
+    graphResult.nodes.forEach((n) => prMap.set(n.id, n.pageRank));
+
+    const mapped = rows.map((row) => {
+      const item = mapConvocatoriaRow(row);
+      const sim = item.similitud_semantica ?? 0;
+      const pr = prMap.get(item.entidad) || 0.02;
+      const score = Number((sim * 0.7 + pr * 0.3).toFixed(4));
+      return {
+        ...item,
+        similitud_semantica: sim,
+        pagerank_entidad: pr,
+        score_hibrido: score,
+      };
+    });
+
+    mapped.sort((a, b) => (b.score_hibrido || 0) - (a.score_hibrido || 0));
+    return mapped.slice(0, options.limit || 10);
+  } catch (err) {
+    console.warn('[DB] No se pudo ejecutar hybridSearch en Neon:', err);
+    return [];
   }
-
-  if (options.maxPrice) {
-    results = results.filter((c) => c.monto_referencial_bs <= options.maxPrice!);
-  }
-
-  results.sort((a, b) => (b.score_hibrido || 0) - (a.score_hibrido || 0));
-
-  return results.slice(0, options.limit || 10);
 }
 
 /**
- * Inserta o actualiza una convocatoria
+ * Inserta o actualiza una convocatoria real en Neon PostgreSQL
  */
-export async function upsertConvocatoria(item: Convocatoria): Promise<void> {
-  const idx = memoryConvocatorias.findIndex((c) => c.cuce === item.cuce);
-  if (idx !== -1) {
-    memoryConvocatorias[idx] = { ...memoryConvocatorias[idx], ...item };
-  } else {
-    memoryConvocatorias.unshift(item);
-  }
+export async function upsertConvocatoria(item: Convocatoria, embedding?: number[]): Promise<void> {
+  const vecLiteral = embedding && embedding.length === 1024 ? `[${embedding.join(',')}]` : null;
+  await neonQuery(
+    `INSERT INTO sicoes_convocatorias (
+      cuce, entidad, tipo_entidad, tipo_contratacion, objeto, modalidad, subasta,
+      departamento, monto_referencial_bs, monto_adjudicado_bs,
+      fecha_publicacion, fecha_presentacion, fecha_adjudicacion,
+      estado, adjudicatario, formularios, contacto, normativa,
+      pliego_url, formulario_500_url, embedding, updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7,
+      $8, $9, $10,
+      $11, $12, $13,
+      $14, $15, $16, $17, $18,
+      $19, $20, $21::vector, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (cuce) DO UPDATE SET
+      entidad = EXCLUDED.entidad,
+      objeto = EXCLUDED.objeto,
+      estado = EXCLUDED.estado,
+      updated_at = CURRENT_TIMESTAMP`,
+    [
+      item.cuce,
+      item.entidad,
+      item.tipo_entidad,
+      item.tipo_contratacion ?? null,
+      item.objeto,
+      item.modalidad,
+      item.subasta,
+      item.departamento,
+      item.monto_referencial_bs,
+      item.monto_adjudicado_bs,
+      item.fecha_publicacion,
+      item.fecha_presentacion,
+      item.fecha_adjudicacion,
+      item.estado,
+      item.adjudicatario,
+      item.formularios ?? null,
+      item.contacto ?? null,
+      item.normativa ?? null,
+      item.pliego_url,
+      item.formulario_500_url,
+      vecLiteral,
+    ]
+  );
 }
 
 /**
- * Obtener aristas del grafo
+ * Obtener aristas reales del grafo desde Neon PostgreSQL
  */
 export async function getGraphEdges(): Promise<GraphEdge[]> {
-  return [...memoryGraphEdges];
+  try {
+    const rows = await neonQuery<{ source: string; target: string; weight: number }>(
+      `SELECT source_node AS source, target_node AS target, weight::float AS weight
+       FROM sicoes_graph_edges`
+    );
+    return rows.map((r) => ({
+      source: String(r.source),
+      target: String(r.target),
+      weight: Number(r.weight || 1),
+    }));
+  } catch (err) {
+    console.warn('[DB] No se pudo consultar getGraphEdges en Neon:', err);
+    return [];
+  }
 }
 
 /**
- * Guardar nueva arista
+ * Guardar nueva arista real en Neon PostgreSQL
  */
 export async function addGraphEdge(edge: GraphEdge): Promise<void> {
-  memoryGraphEdges.push(edge);
+  await neonQuery(
+    `INSERT INTO sicoes_graph_edges (source_node, target_node, edge_type, weight)
+     VALUES ($1, $2, 'CONVOCA_RUBRO', $3)
+     ON CONFLICT (source_node, target_node, edge_type) DO NOTHING`,
+    [edge.source, edge.target, edge.weight ?? 1.0]
+  );
 }
 
 /**
- * Guardar registro de uso de Telegram (Usage Mining)
+ * Guardar registro de uso de Telegram / Web (Web Usage Mining)
  */
 export async function logUsage(log: Omit<UsageLog, 'id' | 'queried_at'>): Promise<void> {
-  memoryUsageLogs.unshift({
-    id: memoryUsageLogs.length + 1,
-    ...log,
-    queried_at: new Date().toISOString(),
-  });
+  try {
+    await neonQuery(
+      `INSERT INTO sicoes_usage_logs (telegram_user_id, username, query_text, matched_cuce, response_time_ms)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        log.telegram_user_id ?? null,
+        log.username ?? null,
+        log.query_text,
+        log.matched_cuce ?? null,
+        Math.round(log.response_time_ms || 0),
+      ]
+    );
+  } catch (err) {
+    console.warn('[DB] No se pudo registrar logUsage en Neon:', err);
+  }
 }
 
 /**
- * Obtener logs de uso para el Dashboard
+ * Obtener logs reales de uso para el Dashboard
  */
 export async function getUsageLogs(limit = 20): Promise<UsageLog[]> {
-  return memoryUsageLogs.slice(0, limit);
+  try {
+    const rows = await neonQuery<{
+      id: number;
+      telegram_user_id: string | null;
+      username: string | null;
+      query_text: string;
+      matched_cuce: string | null;
+      response_time_ms: number;
+      queried_at: string;
+    }>(
+      `SELECT id, telegram_user_id, username, query_text, matched_cuce, response_time_ms, queried_at
+       FROM sicoes_usage_logs
+       ORDER BY queried_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+
+    return rows.map((r) => ({
+      id: Number(r.id),
+      telegram_user_id: r.telegram_user_id != null ? Number(r.telegram_user_id) : undefined,
+      username: r.username ?? undefined,
+      query_text: String(r.query_text),
+      matched_cuce: r.matched_cuce ?? undefined,
+      response_time_ms: Number(r.response_time_ms || 0),
+      queried_at: String(r.queried_at),
+    }));
+  } catch (err) {
+    console.warn('[DB] No se pudo consultar getUsageLogs en Neon:', err);
+    return [];
+  }
 }
 
 /**
- * Métricas consolidadas para el Dashboard
+ * Métricas consolidadas en vivo desde Neon PostgreSQL para el Dashboard
  */
 export async function getDashboardMetrics() {
-  const totalConvocatorias = memoryConvocatorias.length;
-  const vigentes = memoryConvocatorias.filter((c) => c.estado === 'VIGENTE').length;
-  const adjudicadas = memoryConvocatorias.filter((c) => c.estado === 'ADJUDICADA').length;
-  const desiertas = memoryConvocatorias.filter((c) => c.estado === 'DESIERTA').length;
+  try {
+    const [convSummary] = await neonQuery<{
+      total: number;
+      vigentes: number;
+      adjudicadas: number;
+      contratadas: number;
+      desiertas: number;
+      monto_total: string;
+      monto_adjudicado: string;
+    }>(
+      `SELECT
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE estado = 'VIGENTE')::int AS vigentes,
+         COUNT(*) FILTER (WHERE estado = 'ADJUDICADA')::int AS adjudicadas,
+         COUNT(*) FILTER (WHERE estado = 'CONTRATADA')::int AS contratadas,
+         COUNT(*) FILTER (WHERE estado = 'DESIERTA')::int AS desiertas,
+         COALESCE(SUM(monto_referencial_bs), 0)::text AS monto_total,
+         COALESCE(SUM(monto_adjudicado_bs), 0)::text AS monto_adjudicado
+       FROM sicoes_convocatorias`
+    );
 
-  const montoTotalLicitado = memoryConvocatorias.reduce((sum, c) => sum + Number(c.monto_referencial_bs), 0);
-  const montoAdjudicado = memoryConvocatorias.reduce((sum, c) => sum + Number(c.monto_adjudicado_bs || 0), 0);
+    const [usageSummary] = await neonQuery<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM sicoes_usage_logs`
+    );
 
-  const graphAnalysis = computeGraphMining(memoryGraphEdges);
+    const edges = await getGraphEdges();
+    const graphAnalysis = computeGraphMining(edges);
 
-  return {
-    totalConvocatorias,
-    vigentes,
-    adjudicadas,
-    desiertas,
-    montoTotalLicitado,
-    montoAdjudicado,
-    totalConsultasTelegram: memoryUsageLogs.length,
-    graphDensity: graphAnalysis.density,
-    totalNodosGrafo: graphAnalysis.totalNodes,
-    totalAristasGrafo: graphAnalysis.totalEdges,
-    topPageRank: graphAnalysis.topPageRank,
-    topHubs: graphAnalysis.topHubs,
-    topAuthorities: graphAnalysis.topAuthorities,
-  };
+    return {
+      totalConvocatorias: convSummary?.total ?? 0,
+      vigentes: convSummary?.vigentes ?? 0,
+      adjudicadas: convSummary?.adjudicadas ?? 0,
+      contratadas: convSummary?.contratadas ?? 0,
+      desiertas: convSummary?.desiertas ?? 0,
+      montoTotalLicitado: Number(convSummary?.monto_total ?? 0),
+      montoAdjudicado: Number(convSummary?.monto_adjudicado ?? 0),
+      totalConsultasTelegram: usageSummary?.total ?? 0,
+      graphDensity: graphAnalysis.density,
+      totalNodosGrafo: graphAnalysis.totalNodes,
+      totalAristasGrafo: graphAnalysis.totalEdges,
+      topPageRank: graphAnalysis.topPageRank,
+      topHubs: graphAnalysis.topHubs,
+      topAuthorities: graphAnalysis.topAuthorities,
+    };
+  } catch (err) {
+    console.warn('[DB] No se pudo consultar getDashboardMetrics en Neon:', err);
+    return {
+      totalConvocatorias: 0,
+      vigentes: 0,
+      adjudicadas: 0,
+      contratadas: 0,
+      desiertas: 0,
+      montoTotalLicitado: 0,
+      montoAdjudicado: 0,
+      totalConsultasTelegram: 0,
+      graphDensity: 0,
+      totalNodosGrafo: 0,
+      totalAristasGrafo: 0,
+      topPageRank: [],
+      topHubs: [],
+      topAuthorities: [],
+    };
+  }
 }
-

@@ -22,9 +22,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       },
       body: JSON.stringify({
         input: [text.slice(0, 2048)],
-        model: 'nvidia/nv-embedqa-e5-v5',
+        model: 'nvidia/nemotron-3.5-embed-1b',
         input_type: 'query',
         encoding_format: 'float',
+        dimensions: 1024,
       }),
     });
 
@@ -69,7 +70,7 @@ Indica siempre el Código CUCE, la entidad, el monto en Bolivianos (Bs) y la fec
         Authorization: `Bearer ${nvidiaApiKey}`,
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.1-70b-instruct',
+        model: 'nvidia/nemotron-3.5-bolt-e4b',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
