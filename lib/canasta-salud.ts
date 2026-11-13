@@ -7,6 +7,7 @@ export interface CanastaItem {
   categoria: string;
   unidad_medida: string;
   precio_bs: number;
+  fuente?: string;
 }
 
 export interface CentroSaludItem {
@@ -20,6 +21,44 @@ export interface CentroSaludItem {
   telefono: string | null;
   horario: string | null;
   distancia_km?: number;
+}
+
+export interface MedicamentoItem {
+  id: number;
+  fecha: string;
+  departamento: string;
+  cadena: string;
+  producto: string;
+  laboratorio: string | null;
+  categoria: string | null;
+  presentacion: string | null;
+  precio_bs: number;
+  precio_anterior_bs: number | null;
+  descuento_pct: number | null;
+  enlace: string | null;
+  imagen: string | null;
+  disponible: boolean;
+}
+
+export interface ComparativaMedicamento {
+  termino: string;
+  farmacorpTotal: number;
+  chavezTotal: number;
+  items: Array<{
+    nombre: string;
+    cadena: string;
+    precio_bs: number;
+    laboratorio: string | null;
+    presentacion: string | null;
+    enlace: string | null;
+    descuento_pct: number | null;
+  }>;
+  resumenAhorro?: {
+    mejorCadena: string;
+    precioMin: number;
+    precioMax: number;
+    ahorroBs: number;
+  };
 }
 
 const OAP_CSV_URL =
@@ -130,6 +169,7 @@ export async function getCanastaPrecios(options: {
   categoria?: string;
   query?: string;
   departamento?: string;
+  fuente?: string;
   limit?: number;
 } = {}): Promise<CanastaItem[]> {
   try {
@@ -142,7 +182,12 @@ export async function getCanastaPrecios(options: {
 
     const depto = (options.departamento || 'LA PAZ').toUpperCase();
     const params: unknown[] = [depto];
-    const conditions = [`departamento = $1`];
+    const conditions = [`UPPER(departamento) = $1`];
+
+    if (options.fuente) {
+      params.push(`%${options.fuente}%`);
+      conditions.push(`fuente ILIKE $${params.length}`);
+    }
 
     if (options.categoria) {
       params.push(options.categoria);
@@ -159,7 +204,7 @@ export async function getCanastaPrecios(options: {
 
     const rows = await neonQuery<Record<string, unknown>>(
       `SELECT DISTINCT ON (producto)
-              fecha::text AS fecha, departamento, producto, categoria, unidad_medida, precio_bs::float AS precio_bs
+              fecha::text AS fecha, departamento, producto, categoria, unidad_medida, precio_bs::float AS precio_bs, fuente
        FROM canasta_precios
        WHERE ${conditions.join(' AND ')}
        ORDER BY producto ASC, fecha DESC
@@ -174,15 +219,16 @@ export async function getCanastaPrecios(options: {
       categoria: String(r.categoria || ''),
       unidad_medida: String(r.unidad_medida),
       precio_bs: Number(r.precio_bs),
+      fuente: r.fuente ? String(r.fuente) : undefined,
     }));
   } catch (err) {
-    console.warn('[CANASTA] Error consultando precios OAP:', err);
+    console.warn('[CANASTA] Error consultando precios OAP/Hipermaxi:', err);
     return [];
   }
 }
 
 /**
- * Compara precios de la fecha más reciente entre La Paz, Cochabamba y Santa Cruz
+ * Compara precios de la fecha más reciente entre La Paz, Cochabamba y Santa Cruz (Eje Central)
  */
 export async function compareCanastaEje(): Promise<
   Array<{ producto: string; unidad: string; fecha: string; laPaz?: number; cbba?: number; scz?: number }>
@@ -194,13 +240,10 @@ export async function compareCanastaEje(): Promise<
     if (!count) await syncCanastaOapToNeon();
 
     const rows = await neonQuery<Record<string, unknown>>(
-      `WITH latest AS (
-         SELECT MAX(fecha) AS max_fecha FROM canasta_precios
-       )
-       SELECT c.fecha::text AS fecha, c.departamento, c.producto, c.unidad_medida, c.precio_bs::float AS precio_bs
-       FROM canasta_precios c, latest l
-       WHERE c.fecha = l.max_fecha
-       ORDER BY c.producto ASC`
+      `SELECT c.fecha::text AS fecha, UPPER(c.departamento) AS departamento, c.producto, c.unidad_medida, c.precio_bs::float AS precio_bs
+       FROM canasta_precios c
+       WHERE c.fecha >= (SELECT MAX(fecha) - INTERVAL '7 days' FROM canasta_precios)
+       ORDER BY c.producto ASC, c.fecha DESC`
     );
 
     const map = new Map<
@@ -215,24 +258,32 @@ export async function compareCanastaEje(): Promise<
         unidad: String(r.unidad_medida),
         fecha: String(r.fecha).slice(0, 10),
       };
-      const dep = String(r.departamento).toUpperCase();
+      const dep = String(r.departamento);
       const val = Number(r.precio_bs);
-      if (dep === 'LA PAZ') entry.laPaz = val;
-      else if (dep === 'COCHABAMBA') entry.cbba = val;
-      else if (dep === 'SANTA CRUZ') entry.scz = val;
+      if (dep === 'LA PAZ' && entry.laPaz == null) entry.laPaz = val;
+      else if (dep === 'COCHABAMBA' && entry.cbba == null) entry.cbba = val;
+      else if (dep === 'SANTA CRUZ' && entry.scz == null) entry.scz = val;
       map.set(prod, entry);
     }
 
-    return Array.from(map.values()).slice(0, 10);
+    return Array.from(map.values()).filter((e) => e.laPaz || e.cbba || e.scz).slice(0, 10);
   } catch (err) {
     console.warn('[CANASTA] Error comparando eje troncal:', err);
     return [];
   }
 }
 
-async function fetchOsmNominatim(queryTerm: string, limit = 15): Promise<CentroSaludItem[]> {
+const CIUDADES_VIEWBOX: Record<string, string> = {
+  'LA PAZ': '-68.24,-16.42,-68.00,-16.62',
+  'COCHABAMBA': '-66.25,-17.32,-66.08,-17.46',
+  'SANTA CRUZ': '-63.26,-17.72,-63.10,-17.88',
+};
+
+async function fetchOsmNominatim(queryTerm: string, limit = 15, depto = 'La Paz'): Promise<CentroSaludItem[]> {
+  const normDepto = depto.toUpperCase();
+  const box = CIUDADES_VIEWBOX[normDepto] || CIUDADES_VIEWBOX['LA PAZ'];
   const url =
-    `${NOMINATIM_URL}?q=${encodeURIComponent(queryTerm)}&viewbox=-68.24,-16.42,-68.00,-16.62` +
+    `${NOMINATIM_URL}?q=${encodeURIComponent(queryTerm)}&viewbox=${box}` +
     `&bounded=1&format=jsonv2&addressdetails=1&extratags=1&limit=${limit}`;
   const res = await fetch(url, {
     signal: AbortSignal.timeout(15000),
@@ -260,7 +311,7 @@ async function fetchOsmNominatim(queryTerm: string, limit = 15): Promise<CentroS
         osm_id: `${it.osm_type || 'node'}_${it.osm_id}`,
         nombre: it.name || fallbackName,
         tipo,
-        departamento: 'La Paz',
+        departamento: depto,
         direccion: it.display_name ? it.display_name.split(',').slice(1, 4).join(',').trim() : null,
         lat: Number(it.lat),
         lon: Number(it.lon),
@@ -271,21 +322,21 @@ async function fetchOsmNominatim(queryTerm: string, limit = 15): Promise<CentroS
 }
 
 /**
- * Sincroniza centros reales de salud en La Paz desde OpenStreetMap Nominatim hacia Neon
+ * Sincroniza centros reales de salud desde OpenStreetMap Nominatim hacia Neon
  */
-export async function syncCentrosSaludOsmToNeon(): Promise<number> {
+export async function syncCentrosSaludOsmToNeon(depto = 'La Paz'): Promise<number> {
   const amenities = ['hospital', 'clinic', 'pharmacy'];
   const collected = new Map<string, CentroSaludItem>();
 
   for (const amenity of amenities) {
     try {
-      const list = await fetchOsmNominatim(`[${amenity}]`, 12);
+      const list = await fetchOsmNominatim(`[${amenity}]`, 12, depto);
       for (const item of list) {
-        collected.set(item.osm_id, { ...item, tipo: amenity });
+        collected.set(item.osm_id, { ...item, tipo: amenity, departamento: depto });
       }
       await new Promise((r) => setTimeout(r, 1100)); // Respetar límite 1 req/s de Nominatim
     } catch (err) {
-      console.warn(`[SALUD] Error consultando Nominatim [${amenity}]:`, err);
+      console.warn(`[SALUD] Error consultando Nominatim [${amenity}] en ${depto}:`, err);
     }
   }
 
@@ -305,6 +356,7 @@ export async function syncCentrosSaludOsmToNeon(): Promise<number> {
      ON CONFLICT (osm_id) DO UPDATE SET
        nombre = EXCLUDED.nombre,
        tipo = EXCLUDED.tipo,
+       departamento = EXCLUDED.departamento,
        direccion = EXCLUDED.direccion,
        lat = EXCLUDED.lat,
        lon = EXCLUDED.lon,
@@ -400,4 +452,115 @@ export async function searchCentrosSalud(options: {
     return [];
   }
 }
+
+/**
+ * Consulta medicamentos y precios reales en Neon PostgreSQL
+ * (Farmacorp y Farmacias Chávez)
+ */
+export async function getMedicamentosPrecios(options: {
+  query?: string;
+  cadena?: string;
+  departamento?: string;
+  limit?: number;
+} = {}): Promise<MedicamentoItem[]> {
+  try {
+    const params: unknown[] = [];
+    const conditions: string[] = ['disponible = true'];
+
+    if (options.cadena) {
+      params.push(`%${options.cadena}%`);
+      conditions.push(`cadena ILIKE $${params.length}`);
+    }
+
+    if (options.query) {
+      params.push(`%${options.query}%`);
+      conditions.push(`(producto ILIKE $${params.length} OR laboratorio ILIKE $${params.length} OR categoria ILIKE $${params.length})`);
+    }
+
+    if (options.departamento) {
+      params.push(options.departamento);
+      conditions.push(`UPPER(departamento) = UPPER($${params.length})`);
+    }
+
+    const limitVal = Math.min(Math.max(Number(options.limit || 10), 1), 50);
+    params.push(limitVal);
+
+    const rows = await neonQuery<Record<string, unknown>>(
+      `SELECT id, fecha::text AS fecha, departamento, cadena, producto, laboratorio, categoria,
+              presentacion, precio_bs::float AS precio_bs, precio_anterior_bs::float AS precio_anterior_bs,
+              descuento_pct::float AS descuento_pct, enlace, imagen, disponible
+       FROM medicamentos_precios
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY precio_bs ASC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    return rows.map((r) => ({
+      id: Number(r.id),
+      fecha: String(r.fecha).slice(0, 10),
+      departamento: String(r.departamento),
+      cadena: String(r.cadena),
+      producto: String(r.producto),
+      laboratorio: r.laboratorio ? String(r.laboratorio) : null,
+      categoria: r.categoria ? String(r.categoria) : null,
+      presentacion: r.presentacion ? String(r.presentacion) : null,
+      precio_bs: Number(r.precio_bs),
+      precio_anterior_bs: r.precio_anterior_bs != null ? Number(r.precio_anterior_bs) : null,
+      descuento_pct: r.descuento_pct != null ? Number(r.descuento_pct) : null,
+      enlace: r.enlace ? String(r.enlace) : null,
+      imagen: r.imagen ? String(r.imagen) : null,
+      disponible: Boolean(r.disponible),
+    }));
+  } catch (err) {
+    console.warn('[FARMACIAS] Error consultando medicamentos_precios:', err);
+    return [];
+  }
+}
+
+/**
+ * Compara precios de un fármaco entre Farmacorp y Farmacias Chávez
+ */
+export async function compareMedicamentos(query: string): Promise<ComparativaMedicamento> {
+  const all = await getMedicamentosPrecios({ query, limit: 30 });
+
+  const farmacorpItems = all.filter((m) => m.cadena.toLowerCase().includes('farmacorp'));
+  const chavezItems = all.filter((m) => m.cadena.toLowerCase().includes('chavez'));
+
+  const items = all.slice(0, 8).map((m) => ({
+    nombre: m.producto,
+    cadena: m.cadena,
+    precio_bs: m.precio_bs,
+    laboratorio: m.laboratorio,
+    presentacion: m.presentacion,
+    enlace: m.enlace,
+    descuento_pct: m.descuento_pct,
+  }));
+
+  let resumenAhorro: ComparativaMedicamento['resumenAhorro'];
+
+  if (farmacorpItems.length > 0 && chavezItems.length > 0) {
+    const minF = Math.min(...farmacorpItems.map((m) => m.precio_bs));
+    const minC = Math.min(...chavezItems.map((m) => m.precio_bs));
+    const maxVal = Math.max(minF, minC);
+    const minVal = Math.min(minF, minC);
+    const mejor = minF < minC ? 'Farmacorp' : minC < minF ? 'Farmacias Chávez' : 'Ambas al mismo precio';
+
+    resumenAhorro = {
+      mejorCadena: mejor,
+      precioMin: minVal,
+      precioMax: maxVal,
+      ahorroBs: Number((maxVal - minVal).toFixed(2)),
+    };
+  }
+
+  return {
+    termino: query,
+    farmacorpTotal: farmacorpItems.length,
+    chavezTotal: chavezItems.length,
+    items,
+    resumenAhorro,
+  };
+}
+
 

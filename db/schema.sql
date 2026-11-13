@@ -119,3 +119,28 @@ CREATE TABLE IF NOT EXISTS centros_salud (
 );
 
 CREATE INDEX IF NOT EXISTS centros_salud_tipo_idx ON centros_salud (tipo);
+
+-- 7. Precios de Medicamentos y Productos Farmacéuticos (Farmacorp & Farmacias Chávez)
+CREATE TABLE IF NOT EXISTS medicamentos_precios (
+    id SERIAL PRIMARY KEY,
+    fecha DATE NOT NULL,
+    departamento VARCHAR(50) NOT NULL, -- 'La Paz', 'Santa Cruz', 'Cochabamba', 'Nacional'
+    cadena VARCHAR(100) NOT NULL,       -- 'Farmacorp', 'Farmacias Chavez'
+    producto VARCHAR(255) NOT NULL,
+    laboratorio VARCHAR(120),           -- Laboratorio o proveedor (ej. Bagó, Inti, Roemmers)
+    categoria VARCHAR(100),             -- ej. 'Medicamentos', 'Analgésicos', 'Cuidado Personal'
+    presentacion VARCHAR(120),          -- ej. 'X 20 tabletas', 'Jarabe 120 ml'
+    precio_bs NUMERIC(10, 2) NOT NULL,  -- Precio actual de venta
+    precio_anterior_bs NUMERIC(10, 2),  -- Precio de lista / tachado si aplica
+    descuento_pct NUMERIC(5, 2),        -- Porcentaje de descuento calculado
+    enlace TEXT,                        -- Enlace al catálogo online
+    imagen TEXT,                        -- URL de la imagen del producto
+    disponible BOOLEAN DEFAULT TRUE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT med_precios_uniq UNIQUE (fecha, cadena, departamento, producto)
+);
+
+CREATE INDEX IF NOT EXISTS med_cadena_depto_idx ON medicamentos_precios (cadena, departamento, fecha DESC);
+CREATE INDEX IF NOT EXISTS med_producto_idx ON medicamentos_precios (producto);
+CREATE INDEX IF NOT EXISTS med_precio_idx ON medicamentos_precios (precio_bs);
+

@@ -4,6 +4,8 @@ import {
   compareCanastaEje,
   syncCanastaOapToNeon,
   searchCentrosSalud,
+  getMedicamentosPrecios,
+  compareMedicamentos,
 } from './canasta-salud';
 import { askLlama } from './nvidia-ai';
 import { getAppConfig } from './config';
@@ -71,8 +73,9 @@ export interface BotReply {
 export const TELEGRAM_COMMANDS_MENU = [
   { command: 'start', description: 'Información del bot y guía de comandos' },
   { command: 'sicoes', description: 'Módulo SICOES: licitaciones La Paz e IA' },
-  { command: 'canasta', description: 'Módulo Canasta Familiar (precios OAP)' },
-  { command: 'salud', description: 'Módulo Centros de Salud y GPS (La Paz)' },
+  { command: 'canasta', description: 'Módulo Canasta Familiar (OAP e Hipermaxi)' },
+  { command: 'salud', description: 'Módulo Centros de Salud y GPS' },
+  { command: 'farmacia', description: 'Precios de medicamentos (Farmacorp & Chávez)' },
 ];
 
 const BACK_TO_HOME_ROW: InlineKeyboardButton[] = [{ text: '⬅️ Menú Principal', callback_data: 'menu_home' }];
@@ -136,8 +139,8 @@ function buildMainMenu(firstName: string): { text: string; replyMarkup: ReplyMar
     `• <code>/salud</code> — Hospitales, clínicas y farmacias OSM + Google Maps\n\n` +
     `⚡ <b>Atajos directos por texto o GPS:</b>\n` +
     `• <code>/buscar &lt;tema&gt;</code> | <code>/cuce &lt;código&gt;</code>\n` +
-    `• <code>/canasta &lt;producto&gt;</code> | <code>/salud &lt;zona&gt;</code>\n` +
-    `• Envía tu 📍 <b>ubicación GPS</b> (📎 → Ubicación) para ver centros cercanos</blockquote>\n\n` +
+    `• <code>/canasta &lt;producto&gt;</code> | <code>/farmacia &lt;medicamento&gt;</code>\n` +
+    `• <code>/salud &lt;zona&gt;</code> | Envía tu 📍 <b>ubicación GPS</b></blockquote>\n\n` +
     `⬇️ <b>Selecciona un módulo o usa el menú inferior:</b>`;
 
   const replyMarkup: ReplyMarkup = {
@@ -154,37 +157,38 @@ function buildMainMenu(firstName: string): { text: string; replyMarkup: ReplyMar
   return { text, replyMarkup };
 }
 
-function buildSicoesMenu(): { text: string; replyMarkup: ReplyMarkup } {
+function buildSicoesMenu(city = 'La Paz', tipo = 'Todos'): { text: string; replyMarkup: ReplyMarkup } {
   const text =
-    `🏛️ <b>Módulo SICOES — La Paz</b>\n\n` +
-    `<blockquote><b>Descripción del módulo:</b>\n` +
-    `Monitorea contrataciones públicas reales del departamento de <b>La Paz</b> extraídas de <code>sicoes.gob.bo</code> e indexadas en Neon PostgreSQL (<code>pgvector</code>).\n\n` +
-    `Permite revisar convocatorias abiertas o cerradas, buscar por similitud semántica con IA (<code>/buscar &lt;texto&gt;</code>), consultar fichas por código (<code>/cuce &lt;id&gt;</code>) y analizar la red con <b>PageRank</b> y <b>HITS</b>.</blockquote>\n\n` +
-    `⬇️ <b>Elige una acción de SICOES:</b>`;
+    `🏛️ <b>Módulo SICOES — Contrataciones Estatales 🇧🇴</b>\n\n` +
+    `<blockquote><b>Filtros activos:</b>\n` +
+    `• Departamento: <b>${escHtml(city)}</b>\n` +
+    `• Tipo de Contrato: <b>${escHtml(tipo)}</b>\n\n` +
+    `Monitorea convocatorias públicas oficiales de <code>sicoes.gob.bo</code> indexadas con IA vectorial (<code>pgvector</code>) y minería de grafos (PageRank y HITS).</blockquote>\n\n` +
+    `⬇️ <b>Elige una opción para consultar:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
       [
         { text: '🟢 Vigentes', callback_data: 'sicoes_vigentes' },
         { text: '🔴 Cerradas', callback_data: 'sicoes_cerradas' },
-        { text: '🆕 Recientes', callback_data: 'sicoes_recientes' },
+        { text: '❌ Desiertas', callback_data: 'sicoes_desiertas' },
       ],
       [
+        { text: '🆕 Recientes', callback_data: 'sicoes_recientes' },
         { text: '🔍 Buscar con IA', callback_data: 'sicoes_buscar_hint' },
         { text: '🆔 Ficha CUCE', callback_data: 'sicoes_cuce_hint' },
       ],
       [
-        { text: '🏆 Top PageRank', callback_data: 'sicoes_entidades' },
-        { text: '🌟 Hubs & Auth', callback_data: 'sicoes_hits' },
+        { text: `🌆 Ciudad [${city}]`, callback_data: 'sicoes_menu_city' },
+        { text: `📋 Rubro [${tipo}]`, callback_data: 'sicoes_menu_tipo' },
       ],
       [
-        { text: '🏗️ Obras', callback_data: 'sicoes_rubro_Obras' },
-        { text: '📦 Bienes', callback_data: 'sicoes_rubro_Bienes' },
-        { text: '🛠️ Servicios', callback_data: 'sicoes_rubro_Servicios' },
+        { text: '🏆 Top PageRank', callback_data: 'sicoes_entidades' },
+        { text: '🌟 Hubs & Auth (HITS)', callback_data: 'sicoes_hits' },
       ],
       [
         { text: '📊 Estadísticas', callback_data: 'sicoes_stats' },
-        { text: '🏠 Inicio', callback_data: 'menu_home' },
+        { text: '🏠 Menú Principal', callback_data: 'menu_home' },
       ],
     ],
   };
@@ -192,23 +196,74 @@ function buildSicoesMenu(): { text: string; replyMarkup: ReplyMarkup } {
   return { text, replyMarkup };
 }
 
-function buildCanastaMenu(): { text: string; replyMarkup: ReplyMarkup } {
+function buildSicoesCityMenu(): { text: string; replyMarkup: ReplyMarkup } {
   const text =
-    `🛒 <b>Módulo Canasta Familiar — La Paz</b>\n\n` +
-    `<blockquote><b>Descripción del módulo:</b>\n` +
-    `Consulta precios referenciales diarios reales publicados por el <b>Observatorio Agroambiental y Productivo (OAP Bolivia)</b> en mercados de La Paz.\n\n` +
-    `Permite explorar productos por categoría, comparar precios entre <b>La Paz, Cochabamba y Santa Cruz</b>, sincronizar la base OAP o buscar directo escribiendo <code>/canasta papa</code> o <code>/canasta pollo</code>.</blockquote>\n\n` +
-    `⬇️ <b>Elige una categoría o herramienta:</b>`;
+    `🌆 <b>Selecciona el Departamento para SICOES:</b>\n\n` +
+    `Filtra licitaciones públicas estatales por región geográfica:`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
       [
-        { text: '🥔 Verduras y Tubérculos', callback_data: 'canasta_cat_verduras' },
-        { text: '🍗 Carnes y Huevo', callback_data: 'canasta_cat_carnes' },
+        { text: '🔵 La Paz (02)', callback_data: 'sicoes_city:La Paz' },
+        { text: '🟢 Santa Cruz (07)', callback_data: 'sicoes_city:Santa Cruz' },
       ],
       [
-        { text: '🌾 Arroz, Aceite y Frutas', callback_data: 'canasta_cat_abarrotes' },
-        { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
+        { text: '🔴 Cochabamba (03)', callback_data: 'sicoes_city:Cochabamba' },
+        { text: '🇧🇴 Todas / Nacional', callback_data: 'sicoes_city:ALL' },
+      ],
+      BACK_TO_SICOES_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+function buildSicoesTipoMenu(): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `📋 <b>Selecciona el Tipo de Contratación:</b>\n\n` +
+    `Filtra convocatorias según el rubro requerido:`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '📦 Bienes', callback_data: 'sicoes_tipo:Bienes' },
+        { text: '🏗️ Obras', callback_data: 'sicoes_tipo:Obras' },
+      ],
+      [
+        { text: '🛠️ Servicios Generales', callback_data: 'sicoes_tipo:Servicios' },
+        { text: '🧠 Consultorías', callback_data: 'sicoes_tipo:Consultoria' },
+      ],
+      [{ text: '📋 Todos los Tipos', callback_data: 'sicoes_tipo:ALL' }],
+      BACK_TO_SICOES_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+function buildCanastaMenu(city = 'La Paz', fuente = 'Todas'): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🛒 <b>Módulo Canasta Familiar — Eje Central 🇧🇴</b>\n\n` +
+    `<blockquote><b>Fuentes integradas:</b>\n` +
+    `1. 🏪 <b>Observatorio Agroambiental (OAP):</b> Mercados populares.\n` +
+    `2. 🛒 <b>Hipermaxi S.A.:</b> Calacoto (LP), Cañoto (SCZ), Blanco Galindo (CBB).\n\n` +
+    `📍 <b>Ciudad activa:</b> <b>${escHtml(city)}</b> | 🏬 <b>Fuente:</b> <b>${escHtml(fuente)}</b></blockquote>\n\n` +
+    `⬇️ <b>Elige una categoría o herramienta:</b>`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [{ text: '📈 Comparar Eje Troncal (LP vs SCZ vs CBB)', callback_data: 'canasta_comparar' }],
+      [
+        { text: '🥔 Verduras y Tubérculos', callback_data: 'canasta_cat_verduras' },
+        { text: '🍗 Carnes y Pollo', callback_data: 'canasta_cat_carnes' },
+      ],
+      [
+        { text: '🌾 Abarrotes y Aceite', callback_data: 'canasta_cat_abarrotes' },
+        { text: '🥛 Lácteos y Derivados', callback_data: 'canasta_cat_lacteos' },
+      ],
+      [
+        { text: `🏬 Fuente [${fuente}]`, callback_data: 'canasta_menu_fuente' },
+        { text: `🌆 Ciudad [${city}]`, callback_data: 'canasta_menu_city' },
       ],
       [
         { text: '🔄 Actualizar OAP', callback_data: 'canasta_sync' },
@@ -221,13 +276,58 @@ function buildCanastaMenu(): { text: string; replyMarkup: ReplyMarkup } {
   return { text, replyMarkup };
 }
 
+function buildCanastaCityMenu(): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🏙️ <b>Selecciona la Ciudad para Canasta Familiar:</b>\n\n` +
+    `Monitorea y compara precios en las capitales del Eje Central:`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🔵 La Paz', callback_data: 'canasta_city:La Paz' },
+        { text: '🟢 Santa Cruz', callback_data: 'canasta_city:Santa Cruz' },
+      ],
+      [
+        { text: '🔴 Cochabamba', callback_data: 'canasta_city:Cochabamba' },
+        { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
+      ],
+      BACK_TO_CANASTA_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+function buildCanastaFuenteMenu(): { text: string; replyMarkup: ReplyMarkup } {
+  const text =
+    `🏬 <b>Selecciona la Fuente de Precios:</b>\n\n` +
+    `Alterna entre mercados populares y cadenas de supermercados:`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [{ text: '🏬 Todas (OAP Mercados + Hipermaxi)', callback_data: 'canasta_fuente:all' }],
+      [
+        { text: '🏪 Solo OAP (Mercados)', callback_data: 'canasta_fuente:oap' },
+        { text: '🛒 Solo Hipermaxi (Super)', callback_data: 'canasta_fuente:hipermaxi' },
+      ],
+      BACK_TO_CANASTA_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
 function buildSaludMenu(): { text: string; replyMarkup: ReplyMarkup } {
   const text =
-    `🏥 <b>Módulo Centros de Salud — La Paz</b>\n\n` +
+    `🏥 <b>Módulo Salud & Precios Farmacéuticos — Bolivia</b>\n\n` +
     `<blockquote><b>Descripción del módulo:</b>\n` +
-    `Directorio georreferenciado real de hospitales, clínicas, centros médicos y farmacias en <b>La Paz</b> basado en <b>OpenStreetMap</b>.\n\n` +
-    `Muestra dirección, teléfono/horario cuando están disponibles y enlace directo a <b>Google Maps</b>. También puedes escribir <code>/salud Obrero</code> o enviar tu <b>ubicación GPS (📎 → Ubicación)</b> para ordenar los más cercanos.</blockquote>\n\n` +
-    `⬇️ <b>Elige un tipo de establecimiento:</b>`;
+    `1. 🗺️ <b>Directorio Médico OSM:</b> Hospitales, clínicas y farmacias georreferenciadas con enlace a Google Maps y distancia GPS.\n` +
+    `2. 💊 <b>Precios de Medicamentos:</b> Catálogo y comparador de precios en vivo entre <b>Farmacorp</b> y <b>Farmacias Chávez</b>.\n\n` +
+    `⚡ <b>Atajos rápidos:</b>\n` +
+    `• <code>/farmacia paracetamol</code> | <code>/farmacia ibuprofeno</code>\n` +
+    `• <code>/salud Miraflores</code> | <code>/salud hospital</code>\n` +
+    `• Envía tu <b>ubicación GPS (📎 → Ubicación)</b> para ver centros cercanos.</blockquote>\n\n` +
+    `⬇️ <b>Selecciona una opción:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
@@ -236,8 +336,16 @@ function buildSaludMenu(): { text: string; replyMarkup: ReplyMarkup } {
         { text: '🩺 Clínicas y Postas', callback_data: 'salud_tipo_clinic' },
       ],
       [
-        { text: '💊 Farmacias La Paz', callback_data: 'salud_tipo_pharmacy' },
-        { text: '📍 Buscar por Zona / GPS', callback_data: 'salud_buscar_hint' },
+        { text: '📍 Farmacias Físicas (OSM)', callback_data: 'salud_tipo_pharmacy' },
+        { text: '🧭 Buscar por GPS', callback_data: 'salud_buscar_hint' },
+      ],
+      [
+        { text: '💊 Paracetamol (Comparar)', callback_data: 'farmacia_cmp_paracetamol' },
+        { text: '💊 Ibuprofeno (Comparar)', callback_data: 'farmacia_cmp_ibuprofeno' },
+      ],
+      [
+        { text: '🏢 Catálogo Farmacorp', callback_data: 'farmacia_cadena_farmacorp' },
+        { text: '🏢 Catálogo Chávez', callback_data: 'farmacia_cadena_chavez' },
       ],
       BACK_TO_HOME_ROW,
     ],
@@ -246,10 +354,151 @@ function buildSaludMenu(): { text: string; replyMarkup: ReplyMarkup } {
   return { text, replyMarkup };
 }
 
+async function handleFarmaciaCommand(
+  query?: string,
+  action?: string
+): Promise<{ text: string; replyMarkup: ReplyMarkup }> {
+  const searchTerm = query?.trim() || '';
+
+  // Modo catálogo por cadena
+  if (action === 'farmacia_cadena_farmacorp' || action === 'farmacia_cadena_chavez') {
+    const cadena = action.includes('farmacorp') ? 'Farmacorp' : 'Farmacias Chavez';
+    const items = await getMedicamentosPrecios({ cadena, limit: 6 });
+
+    if (items.length === 0) {
+      return {
+        text: `💊 No hay medicamentos registrados aún para <b>${escHtml(cadena)}</b>.\nEjecuta el scraper respectivo o busca con <code>/farmacia paracetamol</code>.`,
+        replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+      };
+    }
+
+    let text = `🏢 <b>Catálogo ${escHtml(cadena)} — Muestra de Precios:</b>\n\n`;
+    for (const m of items) {
+      const desc = m.descuento_pct ? ` 🏷️ <i>-${m.descuento_pct}%</i>` : '';
+      const lab = m.laboratorio && m.laboratorio !== 'No especificado' ? ` | 🏭 ${escHtml(m.laboratorio)}` : '';
+      const link = m.enlace ? ` — <a href="${escHtml(m.enlace)}">Ver online</a>` : '';
+      text +=
+        `• <b>${escHtml(m.producto)}</b>\n` +
+        `  💵 <b>Bs ${m.precio_bs.toFixed(2)}</b>${desc}${lab}\n` +
+        `  📦 Presentación: ${escHtml(m.presentacion || 'Unidad')}${link}\n\n`;
+    }
+
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] } };
+  }
+
+  // Si no se proporcionó término de búsqueda
+  if (!searchTerm) {
+    return {
+      text:
+        `💊 <b>Comparador de Medicamentos — Farmacorp vs Farmacias Chávez</b>\n\n` +
+        `Escribe el nombre del medicamento o principio activo para comparar precios:\n` +
+        `• <code>/farmacia paracetamol</code>\n` +
+        `• <code>/farmacia ibuprofeno</code>\n` +
+        `• <code>/farmacia amoxicilina</code>\n` +
+        `• <code>/farmacia aspirina</code>`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+    };
+  }
+
+  // Comparativa Farmacorp vs Farmacias Chávez
+  const comp = await compareMedicamentos(searchTerm);
+
+  if (comp.items.length === 0) {
+    return {
+      text:
+        `💊 No se encontraron medicamentos con el término <i>"${escHtml(searchTerm)}"</i> en la base de datos.\n\n` +
+        `💡 Intenta con nombres genéricos como <code>paracetamol</code>, <code>ibuprofeno</code> o <code>vitamina</code>.`,
+      replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+    };
+  }
+
+  let text = `💊 <b>Comparativa de Precios: "${escHtml(searchTerm)}"</b>\n\n`;
+
+  if (comp.resumenAhorro) {
+    const { mejorCadena, precioMin, precioMax, ahorroBs } = comp.resumenAhorro;
+    text +=
+      `<blockquote>🎯 <b>Resumen de Oportunidad:</b>\n` +
+      `• Cadena con menor precio: <b>${escHtml(mejorCadena)}</b>\n` +
+      `• Rango de precios: <b>Bs ${precioMin.toFixed(2)}</b> — <b>Bs ${precioMax.toFixed(2)}</b>\n` +
+      (ahorroBs > 0 ? `• Diferencia / Ahorro potencial: <b>Bs ${ahorroBs.toFixed(2)}</b>\n` : '') +
+      `</blockquote>\n\n`;
+  }
+
+  text += `📋 <b>Opciones encontradas (${comp.items.length}):</b>\n\n`;
+  for (const item of comp.items) {
+    const icon = item.cadena.toLowerCase().includes('farmacorp') ? '🟢' : '🔵';
+    const desc = item.descuento_pct ? ` (🏷️ -${item.descuento_pct}%)` : '';
+    const lab = item.laboratorio && item.laboratorio !== 'No especificado' ? ` [${escHtml(item.laboratorio)}]` : '';
+    const link = item.enlace ? ` — <a href="${escHtml(item.enlace)}">Ver</a>` : '';
+
+    text +=
+      `${icon} <b>${escHtml(item.cadena)}</b>: Bs <b>${item.precio_bs.toFixed(2)}</b>${desc}\n` +
+      `   📝 ${escHtml(item.nombre)}${lab}\n` +
+      `   📦 ${escHtml(item.presentacion || 'Unidad')}${link}\n\n`;
+  }
+
+  return { text, replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] } };
+}
+
 async function handleCanastaCommand(
   args: string,
   action?: string
 ): Promise<{ text: string; replyMarkup: ReplyMarkup }> {
+  if (action === 'canasta_menu_city') {
+    return buildCanastaCityMenu();
+  }
+  if (action === 'canasta_menu_fuente') {
+    return buildCanastaFuenteMenu();
+  }
+
+  // Filtrado por Ciudad
+  if (action?.startsWith('canasta_city:')) {
+    const city = action.replace('canasta_city:', '');
+    const items = await getCanastaPrecios({ departamento: city, limit: 8 });
+    let text = `🏙️ <b>Precios Canasta Familiar — ${escHtml(city)} (OAP & Hipermaxi):</b>\n\n`;
+    for (const p of items) {
+      const src = p.fuente ? ` <i>[${escHtml(p.fuente)}]</i>` : '';
+      text += `• <b>${escHtml(p.producto)}</b>\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)}${src}\n\n`;
+    }
+    return {
+      text,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
+            { text: '🌆 Otra Ciudad', callback_data: 'canasta_menu_city' },
+          ],
+          BACK_TO_CANASTA_ROW,
+        ],
+      },
+    };
+  }
+
+  // Filtrado por Fuente
+  if (action?.startsWith('canasta_fuente:')) {
+    const src = action.replace('canasta_fuente:', '');
+    const fuenteFilter = src === 'all' ? undefined : src === 'oap' ? 'OAP' : 'Hipermaxi';
+    const items = await getCanastaPrecios({ fuente: fuenteFilter, limit: 8 });
+    const label = src === 'all' ? 'Todas (OAP + Hipermaxi)' : src === 'oap' ? 'Solo OAP (Mercados)' : 'Solo Hipermaxi (Supermercado)';
+    let text = `🏬 <b>Precios por Fuente — ${escHtml(label)}:</b>\n\n`;
+    for (const p of items) {
+      const fuenteTag = p.fuente ? ` <i>[${escHtml(p.fuente)}]</i>` : '';
+      text += `• <b>${escHtml(p.producto)}</b> (${escHtml(p.departamento)})\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)}${fuenteTag}\n\n`;
+    }
+    return {
+      text,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: '🏬 Cambiar Fuente', callback_data: 'canasta_menu_fuente' },
+            { text: '📈 Comparar Eje', callback_data: 'canasta_comparar' },
+          ],
+          BACK_TO_CANASTA_ROW,
+        ],
+      },
+    };
+  }
+
   if (action === 'canasta_sync') {
     const sync = await syncCanastaOapToNeon();
     return {
@@ -267,48 +516,52 @@ async function handleCanastaCommand(
       .map(
         (c) =>
           `• <b>${escHtml(c.producto)}</b> (${escHtml(c.unidad)})\n` +
-          `  LPZ: <b>${c.laPaz != null ? `Bs ${c.laPaz.toFixed(2)}` : '-'}</b> | CBBA: ${c.cbba != null ? `Bs ${c.cbba.toFixed(2)}` : '-'} | SCZ: ${c.scz != null ? `Bs ${c.scz.toFixed(2)}` : '-'}`
+          `  LPZ: <b>${c.laPaz != null ? `Bs ${c.laPaz.toFixed(2)}` : '-'}</b> | CBBA: <b>${c.cbba != null ? `Bs ${c.cbba.toFixed(2)}` : '-'}</b> | SCZ: <b>${c.scz != null ? `Bs ${c.scz.toFixed(2)}` : '-'}</b>`
       )
-      .join('\n');
+      .join('\n\n');
     return {
-      text: `📈 <b>Comparativa Eje Troncal — OAP (${escHtml(comp[0].fecha)})</b>\n\n${lines}`,
+      text: `📈 <b>Comparativa de Precios Eje Troncal (OAP & Hipermaxi):</b>\n\n${lines}`,
       replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
     };
   }
 
   let categoria: string | undefined;
-  let title = '🛒 <b>Precios Canasta Familiar — La Paz (OAP)</b>';
+  let title = '🛒 <b>Precios Canasta Familiar — Eje Central</b>';
   if (action === 'canasta_cat_verduras') {
     categoria = 'Verduras y Tubérculos';
-    title = '🥔 <b>Verduras y Tubérculos — La Paz</b>';
+    title = '🥔 <b>Verduras y Tubérculos — Eje Central</b>';
   } else if (action === 'canasta_cat_carnes') {
     categoria = 'Carnes y Huevo';
-    title = '🍗 <b>Carnes y Huevo — La Paz</b>';
+    title = '🍗 <b>Carnes y Pollo — Eje Central</b>';
   } else if (action === 'canasta_cat_abarrotes') {
     categoria = 'Abarrotes y Frutas';
-    title = '🌾 <b>Abarrotes y Frutas — La Paz</b>';
+    title = '🌾 <b>Abarrotes y Aceite — Eje Central</b>';
+  } else if (action === 'canasta_cat_lacteos') {
+    categoria = 'Lácteos';
+    title = '🥛 <b>Lácteos y Bebidas — Eje Central</b>';
   }
 
   const items = await getCanastaPrecios({
     categoria,
     query: args || undefined,
-    departamento: 'LA PAZ',
-    limit: 12,
+    limit: 10,
   });
 
   if (items.length === 0) {
     return {
-      text: `🔎 No se encontraron precios en La Paz para <i>"${escHtml(args)}"</i>.\nPrueba con <code>/canasta papa</code>, <code>/canasta arroz</code> o <code>/canasta pollo</code>.`,
+      text: `🔎 No se encontraron precios para <i>"${escHtml(args)}"</i>.\nPrueba con <code>/canasta papa</code>, <code>/canasta arroz</code> o <code>/canasta pollo</code>.`,
       replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
     };
   }
 
   const list = items
     .map(
-      (p) =>
-        `• <b>${escHtml(p.producto)}</b>\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)} <i>(${escHtml(p.fecha)})</i>`
+      (p) => {
+        const src = p.fuente ? ` <i>[${escHtml(p.fuente)}]</i>` : '';
+        return `• <b>${escHtml(p.producto)}</b> (${escHtml(p.departamento)})\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)}${src}`;
+      }
     )
-    .join('\n');
+    .join('\n\n');
 
   return {
     text: `${title}\n\n${list}`,
@@ -439,13 +692,24 @@ async function resolveAction(params: {
     return handleSaludCommand({ tipo, query: args || undefined });
   }
 
+  // Acciones Medicamentos & Farmacias (Farmacorp & Chávez)
+  if (callbackData?.startsWith('farmacia_') || cmd === '/farmacia') {
+    if (callbackData === 'farmacia_cmp_paracetamol') {
+      return handleFarmaciaCommand('paracetamol');
+    }
+    if (callbackData === 'farmacia_cmp_ibuprofeno') {
+      return handleFarmaciaCommand('ibuprofeno');
+    }
+    return handleFarmaciaCommand(args || undefined, callbackData);
+  }
+
   // Acciones SICOES
   if (cmd === '/vigentes' || callbackData === 'sicoes_vigentes') {
     const items = await getConvocatorias({ estado: 'VIGENTE', limit: 4 });
     if (items.length === 0) {
       return { text: `🟢 No hay licitaciones VIGENTE registradas.`, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
     }
-    let text = `🟢 <b>Licitaciones VIGENTES en La Paz (${items.length}):</b>\n\n`;
+    let text = `🟢 <b>Licitaciones VIGENTES en SICOES (${items.length}):</b>\n\n`;
     for (const item of items) {
       text +=
         `📄 <code>${escHtml(item.cuce)}</code>\n` +
@@ -455,6 +719,97 @@ async function resolveAction(params: {
         `🔗 <a href="${escHtml(item.pliego_url)}">Ver Ficha SICOES</a>\n\n`;
     }
     return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] }, matchedCuce: items[0]?.cuce };
+  }
+
+  if (cmd === '/desiertas' || callbackData === 'sicoes_desiertas') {
+    const items = await getConvocatorias({ estado: 'DESIERTA', limit: 4 });
+    if (items.length === 0) {
+      return { text: `❌ No hay licitaciones DESIERTAS registradas.`, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] } };
+    }
+    let text = `❌ <b>Licitaciones DESIERTAS en SICOES (${items.length}):</b>\n\n`;
+    for (const item of items) {
+      text +=
+        `📄 <code>${escHtml(item.cuce)}</code>\n` +
+        `🏢 ${escHtml(item.entidad)}\n` +
+        `📍 ${escHtml(item.departamento)} | 🏷️ ${escHtml(item.tipo_contratacion || item.modalidad)}\n` +
+        `📝 ${escHtml(item.objeto.slice(0, 105))}${item.objeto.length > 105 ? '...' : ''}\n` +
+        `🔗 <a href="${escHtml(item.pliego_url)}">Ver Ficha</a>\n\n`;
+    }
+    return { text, replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] }, matchedCuce: items[0]?.cuce };
+  }
+
+  if (callbackData === 'sicoes_menu_city') {
+    return buildSicoesCityMenu();
+  }
+
+  if (callbackData?.startsWith('sicoes_city:')) {
+    const depto = callbackData.replace('sicoes_city:', '');
+    const deptoFilter = depto === 'ALL' ? undefined : depto;
+    const items = await getConvocatorias({ departamento: deptoFilter, limit: 4 });
+    const label = depto === 'ALL' ? 'Nacional / Todas' : depto;
+    let text = `🌆 <b>Convocatorias SICOES — ${escHtml(label)} (${items.length}):</b>\n\n`;
+    if (items.length === 0) {
+      text += `No hay licitaciones registradas aún para ${escHtml(label)}.`;
+    } else {
+      for (const item of items) {
+        text +=
+          `📄 <code>${escHtml(item.cuce)}</code> [<b>${escHtml(item.estado)}</b>]\n` +
+          `🏢 ${escHtml(item.entidad)}\n` +
+          `📍 ${escHtml(item.departamento)} | 🏷️ ${escHtml(item.tipo_contratacion || item.modalidad)}\n` +
+          `📝 ${escHtml(item.objeto.slice(0, 105))}${item.objeto.length > 105 ? '...' : ''}\n` +
+          `🔗 <a href="${escHtml(item.pliego_url)}">Ver Ficha</a>\n\n`;
+      }
+    }
+    return {
+      text,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: '🌆 Cambiar Ciudad', callback_data: 'sicoes_menu_city' },
+            { text: '📋 Tipo de Contrato', callback_data: 'sicoes_menu_tipo' },
+          ],
+          BACK_TO_SICOES_ROW,
+        ],
+      },
+      matchedCuce: items[0]?.cuce,
+    };
+  }
+
+  if (callbackData === 'sicoes_menu_tipo') {
+    return buildSicoesTipoMenu();
+  }
+
+  if (callbackData?.startsWith('sicoes_tipo:')) {
+    const tipo = callbackData.replace('sicoes_tipo:', '');
+    const tipoFilter = tipo === 'ALL' ? undefined : tipo;
+    const items = await getConvocatorias({ tipoContratacion: tipoFilter, limit: 4 });
+    const label = tipo === 'ALL' ? 'Todos los Rubros' : tipo;
+    let text = `📋 <b>Convocatorias SICOES — Rubro: ${escHtml(label)} (${items.length}):</b>\n\n`;
+    if (items.length === 0) {
+      text += `No hay licitaciones registradas aún para el rubro ${escHtml(label)}.`;
+    } else {
+      for (const item of items) {
+        text +=
+          `📄 <code>${escHtml(item.cuce)}</code> [<b>${escHtml(item.estado)}</b>]\n` +
+          `🏢 ${escHtml(item.entidad)}\n` +
+          `📍 ${escHtml(item.departamento)} | 🏷️ ${escHtml(item.tipo_contratacion || item.modalidad)}\n` +
+          `📝 ${escHtml(item.objeto.slice(0, 105))}${item.objeto.length > 105 ? '...' : ''}\n` +
+          `🔗 <a href="${escHtml(item.pliego_url)}">Ver Ficha</a>\n\n`;
+      }
+    }
+    return {
+      text,
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: '📋 Cambiar Rubro', callback_data: 'sicoes_menu_tipo' },
+            { text: '🌆 Filtrar Ciudad', callback_data: 'sicoes_menu_city' },
+          ],
+          BACK_TO_SICOES_ROW,
+        ],
+      },
+      matchedCuce: items[0]?.cuce,
+    };
   }
 
   if (cmd === '/cerradas' || callbackData === 'sicoes_cerradas') {

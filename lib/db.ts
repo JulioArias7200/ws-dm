@@ -112,6 +112,7 @@ export async function getConvocatorias(filters: {
   estados?: string[];
   tipoContratacion?: string;
   entidad?: string;
+  departamento?: string;
   limit?: number;
 } = {}): Promise<Convocatoria[]> {
   try {
@@ -134,6 +135,11 @@ export async function getConvocatorias(filters: {
     if (filters.entidad) {
       params.push(`%${filters.entidad}%`);
       conditions.push(`entidad ILIKE $${params.length}`);
+    }
+
+    if (filters.departamento && filters.departamento !== 'TODOS' && filters.departamento !== 'ALL') {
+      params.push(`%${filters.departamento}%`);
+      conditions.push(`departamento ILIKE $${params.length}`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -190,7 +196,7 @@ export async function getConvocatoriaByCuce(cuce: string): Promise<Convocatoria 
 export async function hybridSearch(
   queryText: string,
   queryVector?: number[],
-  options: { maxPrice?: number; estado?: string; limit?: number } = {}
+  options: { maxPrice?: number; estado?: string; departamento?: string; limit?: number } = {}
 ): Promise<Convocatoria[]> {
   try {
     const vec = queryVector && queryVector.length === 1024 ? queryVector : await generateEmbedding(queryText);
@@ -202,6 +208,11 @@ export async function hybridSearch(
     if (options.estado && options.estado !== 'TODOS') {
       params.push(options.estado);
       conditions.push(`estado = $${params.length}`);
+    }
+
+    if (options.departamento && options.departamento !== 'TODOS' && options.departamento !== 'ALL') {
+      params.push(`%${options.departamento}%`);
+      conditions.push(`departamento ILIKE $${params.length}`);
     }
 
     if (options.maxPrice) {

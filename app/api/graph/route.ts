@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getGraphEdges } from '@/lib/db';
 import { computeGraphMining } from '@/lib/graph-mining';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const edges = await getGraphEdges();

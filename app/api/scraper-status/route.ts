@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDashboardMetrics, getUsageLogs } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 let scraperState = {
   isRunning: false,
   lastSync: '2026-11-10T18:45:00Z',

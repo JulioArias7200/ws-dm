@@ -47,6 +47,8 @@ next-env.d.ts
 /blob-report/
 /playwright/.cache/
 data_scraped_*.json
+data_hipermaxi_*.html
+*.html.bak
 
 # OS & Editor Files
 .DS_Store
