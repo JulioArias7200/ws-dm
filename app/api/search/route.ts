@@ -7,12 +7,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q') || '';
     const estado = searchParams.get('estado') || 'TODOS';
+    const departamento = searchParams.get('departamento') || searchParams.get('depto') || 'TODOS';
     const maxPrice = searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined;
-    const limit = searchParams.get('limit') ? Number(searchParams.get('limit')) : 10;
+    const limit = searchParams.get('limit') ? Number(searchParams.get('limit')) : 12;
 
     if (!query.trim()) {
       const items = await getConvocatorias({
         estado: estado !== 'TODOS' ? estado : undefined,
+        departamento: departamento !== 'TODOS' ? departamento : undefined,
         limit,
       });
       return NextResponse.json({ success: true, count: items.length, items });
@@ -21,9 +23,10 @@ export async function GET(req: NextRequest) {
     // Generar embedding con NVIDIA NIM (o fallback determinista)
     const embedding = await generateEmbedding(query);
 
-    // Búsqueda híbrida (Coseno + PageRank)
+    // Búsqueda híbrida (Coseno + PageRank) con filtro de departamento
     const results = await hybridSearch(query, embedding, {
       estado,
+      departamento: departamento !== 'TODOS' ? departamento : undefined,
       maxPrice,
       limit,
     });
