@@ -288,3 +288,24 @@ export function renderSicoesCuceHint(sampleCuce: string): TemplateResult {
     replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
   };
 }
+
+export function renderSicoesCuceMissing(): TemplateResult {
+  return {
+    text: `⚠️ Indica un CUCE. Ejemplo: <code>/cuce 26-1262-00-1708614-1-1</code>`,
+    replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+  };
+}
+
+export function renderSicoesCuceNotFound(cuce: string): TemplateResult {
+  return {
+    text: `❌ No se encontró el CUCE <code>${escHtml(cuce)}</code>.`,
+    replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+  };
+}
+
+export function renderSicoesRubroMissing(): TemplateResult {
+  return {
+    text: `⚠️ Indica un rubro. Ejemplo: <code>/rubro obras</code> o <code>/rubro medicamentos</code>`,
+    replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+  };
+}

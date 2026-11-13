@@ -38,9 +38,6 @@ import {
   parseCommand,
   // Botones de retorno
   BACK_TO_HOME_ROW,
-  BACK_TO_SICOES_ROW,
-  BACK_TO_CANASTA_ROW,
-  BACK_TO_SALUD_ROW,
   // Templates principales
   renderMainMenu,
   renderHelpMessage,
@@ -56,6 +53,9 @@ import {
   renderSicoesStats,
   renderSicoesBuscarHint,
   renderSicoesCuceHint,
+  renderSicoesCuceMissing,
+  renderSicoesCuceNotFound,
+  renderSicoesRubroMissing,
   // Templates Canasta
   renderCanastaMenu,
   renderCanastaCityMenu,
@@ -216,7 +216,10 @@ async function resolveAction(params: {
   }
 
   // Menús y submenús principales (4 sectores)
-  if (cmd === '/start' || cmd === '/help' || callbackData === 'menu_home' || callbackData === 'menu_help') {
+  if (cmd === '/help' || callbackData === 'menu_help') {
+    return renderHelpMessage();
+  }
+  if (cmd === '/start' || callbackData === 'menu_home') {
     return renderMainMenu(firstName);
   }
   if (cmd === '/sicoes' || callbackData === 'menu_sicoes') {
@@ -348,10 +351,7 @@ async function resolveAction(params: {
       ? callbackData.replace('sicoes_rubro_', '')
       : args;
     if (!rubroArg) {
-      return {
-        text: `⚠️ Indica un rubro. Ejemplo: <code>/rubro obras</code> o <code>/rubro medicamentos</code>`,
-        replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
-      };
+      return renderSicoesRubroMissing();
     }
     const items = await getConvocatorias({ tipoContratacion: rubroArg, limit: 4 });
     return renderConvocatoriasList(items, {
@@ -364,17 +364,11 @@ async function resolveAction(params: {
   if (cmd === '/cuce') {
     const cuceTarget = args.split(/\s+/)[0];
     if (!cuceTarget) {
-      return {
-        text: `⚠️ Indica un CUCE. Ejemplo: <code>/cuce 26-1262-00-1708614-1-1</code>`,
-        replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
-      };
+      return renderSicoesCuceMissing();
     }
     const item = await getConvocatoriaByCuce(cuceTarget);
     if (!item) {
-      return {
-        text: `❌ No se encontró el CUCE <code>${escHtml(cuceTarget)}</code>.`,
-        replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
-      };
+      return renderSicoesCuceNotFound(cuceTarget);
     }
     return renderCuceFicha(item);
   }
@@ -405,10 +399,7 @@ async function resolveAction(params: {
   // Búsqueda semántica pgvector (/buscar <texto> o mensaje libre)
   const querySearch = cmd === '/buscar' ? args : params.args;
   if (!querySearch) {
-    return {
-      text: `🔍 Escribe qué quieres buscar. Ejemplo: <code>/buscar medicamentos hospital</code>`,
-      replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
-    };
+    return renderSicoesBuscarHint();
   }
 
   const results = await hybridSearch(querySearch, undefined, { limit: 3 });
