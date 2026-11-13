@@ -975,27 +975,50 @@ async function resolveAction(params: {
   }
 
   const contextForLlama = results
-    .map(
-      (r) =>
-        `- CUCE: ${r.cuce} | Entidad: ${r.entidad} | Estado: ${r.estado} | Tipo: ${r.tipo_contratacion || r.modalidad} | Fin: ${formatDateBo(r.fecha_presentacion, 'N/D')} | Objeto: ${r.objeto}`
-    )
+    .map((r) => {
+      const monto =
+        r.monto_referencial_bs != null
+          ? `Bs ${Number(r.monto_referencial_bs).toLocaleString('es-BO')}`
+          : 'Consultar Pliego PDF';
+      const fecha = r.fecha_presentacion
+        ? formatDateBo(r.fecha_presentacion)
+        : r.estado === 'VIGENTE'
+        ? 'Fecha por confirmar'
+        : `Proceso Concluido (${r.estado})`;
+      return `- CUCE: ${r.cuce} | Entidad: ${r.entidad} | Estado: ${r.estado} | Rubro: ${r.tipo_contratacion || r.modalidad} | Monto: ${monto} | Presentación: ${fecha} | Objeto: ${r.objeto}`;
+    })
     .join('\n');
 
   const llamaSummary = await askLlama(querySearch, contextForLlama);
   const listHtml = results
     .map(
       (r) =>
-        `• <code>${escHtml(r.cuce)}</code> [<b>${escHtml(r.estado)}</b>] (${((r.similitud_semantica || 0) * 100).toFixed(1)}% cos)\n  ${escHtml(r.entidad)} — <a href="${escHtml(r.pliego_url)}">Ficha</a>`
+        `• <code>${escHtml(r.cuce)}</code> [<b>${escHtml(r.estado)}</b>] (${((r.similitud_semantica || 0) * 100).toFixed(1)}% cos)\n` +
+        `  🏢 ${escHtml(r.entidad)}\n` +
+        `  📝 <i>${escHtml(r.objeto.slice(0, 95))}${r.objeto.length > 95 ? '...' : ''}</i>\n` +
+        `  🔗 <a href="${escHtml(r.pliego_url)}">Ver Ficha Oficial SICOES</a>`
     )
-    .join('\n');
+    .join('\n\n');
+
+  const topCuce = results[0]?.cuce;
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      topCuce ? [{ text: `📋 Ficha Pliego: ${topCuce.slice(-10)}`, url: results[0].pliego_url }] : [],
+      [
+        { text: '🧠 Ver Consultorías', callback_data: 'sicoes_tipo:Consultoria' },
+        { text: '🟢 Solo Vigentes', callback_data: 'sicoes_vigentes' },
+      ],
+      BACK_TO_SICOES_ROW,
+    ].filter((row) => row.length > 0),
+  };
 
   return {
-    matchedCuce: results[0]?.cuce,
+    matchedCuce: topCuce,
     text:
       `🎯 <b>Resultados SICOES pgvector:</b> <i>"${escHtml(querySearch)}"</i>\n\n` +
       `${escHtml(llamaSummary)}\n\n` +
-      `📌 <b>Coincidencias:</b>\n${listHtml}`,
-    replyMarkup: { inline_keyboard: [BACK_TO_SICOES_ROW] },
+      `📌 <b>Coincidencias indexadas:</b>\n\n${listHtml}`,
+    replyMarkup,
   };
 }
 
