@@ -135,3 +135,4 @@ node ws-dm/scripts/probe_telegram_api.mjs
 ```
 
 Ambas pruebas garantizan que el 100% de las plantillas renderizan HTML válido, que los botones emiten los callbacks correctos y que la experiencia de usuario es fluida y reactiva.
+
