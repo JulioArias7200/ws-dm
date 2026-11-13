@@ -9,6 +9,8 @@
 
 import {
   hybridSearch,
+  hybridSearchPartitioned,
+  checkConvocatoriasCountByDepartment,
   getConvocatorias,
   getConvocatoriaByCuce,
   getDashboardMetrics,
@@ -20,6 +22,7 @@ import {
   syncCanastaOapToNeon,
   searchCentrosSalud,
   getMedicamentosPrecios,
+  getMedicamentosPreciosPaginado,
   compareMedicamentos,
 } from './canasta-salud';
 import { askLlama } from './nvidia-ai';
@@ -46,6 +49,7 @@ import {
   renderSicoesMenu,
   renderSicoesCityMenu,
   renderSicoesTipoMenu,
+  renderSicoesDepartmentEmpty,
   renderConvocatoriasList,
   renderCuceFicha,
   renderSicoesSemanticResults,
@@ -69,7 +73,9 @@ import {
   renderCentrosSaludList,
   renderMedicamentosComparativa,
   renderMedicamentosCatalogo,
+  renderMedicamentosCatalogoPaginado,
   renderSaludBuscarHint,
+  renderFarmaciaBuscarHint,
 } from './TG-msj';
 
 // Re-exportar tipos para consumidores externos (API routes, tests, etc.)
@@ -87,18 +93,45 @@ export const TELEGRAM_COMMANDS_MENU = [
  * Sub-controlador de Farmacias & Medicamentos
  */
 async function handleFarmaciaCommand(query?: string, action?: string): Promise<TemplateResult> {
-  const searchTerm = query?.trim() || '';
-
-  // Modo catálogo por cadena
-  if (action === 'farmacia_cadena_farmacorp' || action === 'farmacia_cadena_chavez') {
-    const cadena = action.includes('farmacorp') ? 'Farmacorp' : 'Farmacias Chavez';
-    const items = await getMedicamentosPrecios({ cadena, limit: 6 });
-    return renderMedicamentosCatalogo(cadena, items);
+  // Hint explicativo de cómo buscar medicamentos
+  if (action === 'farmacia_buscar_hint') {
+    return renderFarmaciaBuscarHint();
   }
 
-  // Si no se proporcionó término de búsqueda
+  // Paginación de catálogo: farmacia_cat:<cadena>:<page>
+  if (action?.startsWith('farmacia_cat:')) {
+    const parts = action.split(':');
+    const cadenaKey = parts[1] || 'farmacorp';
+    const page = parseInt(parts[2] || '1', 10);
+    const cadena = cadenaKey === 'farmacorp' ? 'Farmacorp' : 'Farmacias Chavez';
+    const paginated = await getMedicamentosPreciosPaginado({ cadena, page, pageSize: 5 });
+    return renderMedicamentosCatalogoPaginado(
+      cadena,
+      paginated.items,
+      paginated.page,
+      paginated.totalPages,
+      paginated.total
+    );
+  }
+
+  // Modo catálogo inicial (Página 1 de 5 elementos)
+  if (action === 'farmacia_cadena_farmacorp' || action === 'farmacia_cadena_chavez') {
+    const cadena = action.includes('farmacorp') ? 'Farmacorp' : 'Farmacias Chavez';
+    const paginated = await getMedicamentosPreciosPaginado({ cadena, page: 1, pageSize: 5 });
+    return renderMedicamentosCatalogoPaginado(
+      cadena,
+      paginated.items,
+      paginated.page,
+      paginated.totalPages,
+      paginated.total
+    );
+  }
+
+  const searchTerm = query?.trim() || '';
+
+  // Si no se proporcionó término de búsqueda, mostrar guía de búsqueda
   if (!searchTerm) {
-    return renderMedicamentosComparativa();
+    return renderFarmaciaBuscarHint();
   }
 
   // Comparativa Farmacorp vs Farmacias Chávez
@@ -298,8 +331,19 @@ async function resolveAction(params: {
   if (callbackData?.startsWith('sicoes_city:')) {
     const depto = callbackData.replace('sicoes_city:', '');
     const deptoFilter = depto === 'ALL' ? undefined : depto;
+
+    if (deptoFilter) {
+      const count = await checkConvocatoriasCountByDepartment(deptoFilter);
+      if (count === 0) {
+        return renderSicoesDepartmentEmpty(depto);
+      }
+    }
+
     const items = await getConvocatorias({ departamento: deptoFilter, limit: 4 });
     const label = depto === 'ALL' ? 'Nacional / Todas' : depto;
+    if (items.length === 0 && deptoFilter) {
+      return renderSicoesDepartmentEmpty(depto);
+    }
     return renderConvocatoriasList(items, {
       title: `🌆 <b>Convocatorias SICOES — ${escHtml(label)}</b>`,
       cityLabel: label,
@@ -402,7 +446,7 @@ async function resolveAction(params: {
     return renderSicoesBuscarHint();
   }
 
-  const results = await hybridSearch(querySearch, undefined, { limit: 3 });
+  const results = await hybridSearchPartitioned(querySearch, { minSimilarity: 0.2, limitPerDept: 2, maxTotal: 8 });
   if (results.length === 0) {
     return renderSicoesSemanticResults(querySearch, '', []);
   }

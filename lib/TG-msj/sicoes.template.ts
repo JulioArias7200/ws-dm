@@ -14,35 +14,31 @@ export function renderSicoesMenu(city = 'La Paz', tipo = 'Todos'): TemplateResul
   const text =
     `🏛️ <b>Módulo SICOES — Contrataciones Estatales 🇧🇴</b>\n\n` +
     `<blockquote><b>Filtros activos:</b>\n` +
-    `• Departamento: <b>${escHtml(city)}</b>\n` +
-    `• Tipo de Contrato: <b>${escHtml(tipo)}</b>\n\n` +
-    `Monitorea convocatorias públicas oficiales de <code>sicoes.gob.bo</code> indexadas con IA vectorial (<code>pgvector</code>) y minería de grafos (PageRank y HITS).</blockquote>\n\n` +
-    `⬇️ <b>Elige una opción para consultar:</b>`;
+    `• Departamento: <b>${escHtml(city)}</b> 📍\n` +
+    `• Rubro / Tipo: <b>${escHtml(tipo)}</b> 📋\n\n` +
+    `Monitoreo de contrataciones públicas oficiales de <code>sicoes.gob.bo</code> indexadas con IA vectorial (<code>pgvector</code>) y minería de grafos (PageRank y HITS).</blockquote>\n\n` +
+    `⬇️ <b>Elige una acción o categoría:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
+      [{ text: '🟢 Licitaciones Vigentes (Convocatorias Abiertas)', callback_data: 'sicoes_vigentes' }],
       [
-        { text: '🟢 Vigentes', callback_data: 'sicoes_vigentes' },
-        { text: '🔴 Cerradas', callback_data: 'sicoes_cerradas' },
-        { text: '❌ Desiertas', callback_data: 'sicoes_desiertas' },
+        { text: '🔴 Procesos Cerrados', callback_data: 'sicoes_cerradas' },
+        { text: '❌ Licitaciones Desiertas', callback_data: 'sicoes_desiertas' },
       ],
       [
-        { text: '🆕 Recientes', callback_data: 'sicoes_recientes' },
-        { text: '🔍 Buscar con IA', callback_data: 'sicoes_buscar_hint' },
-        { text: '🆔 Ficha CUCE', callback_data: 'sicoes_cuce_hint' },
+        { text: '🔍 Búsqueda IA (pgvector)', callback_data: 'sicoes_buscar_hint' },
+        { text: '🆔 Ficha por CUCE', callback_data: 'sicoes_cuce_hint' },
       ],
       [
-        { text: `🌆 Ciudad [${city}]`, callback_data: 'sicoes_menu_city' },
-        { text: `📋 Rubro [${tipo}]`, callback_data: 'sicoes_menu_tipo' },
+        { text: `🌆 Ciudad [${city} ▾]`, callback_data: 'sicoes_menu_city' },
+        { text: `📋 Rubro [${tipo} ▾]`, callback_data: 'sicoes_menu_tipo' },
       ],
       [
-        { text: '🏆 Top PageRank', callback_data: 'sicoes_entidades' },
-        { text: '🌟 Hubs & Auth (HITS)', callback_data: 'sicoes_hits' },
+        { text: '🏆 Top Entidades (PageRank)', callback_data: 'sicoes_entidades' },
+        { text: '📊 Estadísticas en Vivo', callback_data: 'sicoes_stats' },
       ],
-      [
-        { text: '📊 Estadísticas', callback_data: 'sicoes_stats' },
-        { text: '🏠 Menú Principal', callback_data: 'menu_home' },
-      ],
+      [{ text: '🏠 Menú Principal', callback_data: 'menu_home' }],
     ],
   };
 
@@ -52,7 +48,7 @@ export function renderSicoesMenu(city = 'La Paz', tipo = 'Todos'): TemplateResul
 export function renderSicoesCityMenu(): TemplateResult {
   const text =
     `🌆 <b>Selecciona el Departamento para SICOES:</b>\n\n` +
-    `Filtra licitaciones públicas estatales por región geográfica:`;
+    `Filtra convocatorias estatales según su ubicación geográfica:`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
@@ -62,7 +58,43 @@ export function renderSicoesCityMenu(): TemplateResult {
       ],
       [
         { text: '🔴 Cochabamba (03)', callback_data: 'sicoes_city:Cochabamba' },
+        { text: '🟡 Oruro (04)', callback_data: 'sicoes_city:Oruro' },
+      ],
+      [
+        { text: '⚪ Potosí (05)', callback_data: 'sicoes_city:Potosí' },
+        { text: '🟣 Chuquisaca (01)', callback_data: 'sicoes_city:Chuquisaca' },
+      ],
+      [
+        { text: '🟤 Tarija (06)', callback_data: 'sicoes_city:Tarija' },
+        { text: '🟢 Beni (08)', callback_data: 'sicoes_city:Beni' },
+      ],
+      [
+        { text: '🔵 Pando (09)', callback_data: 'sicoes_city:Pando' },
         { text: '🇧🇴 Todas / Nacional', callback_data: 'sicoes_city:ALL' },
+      ],
+      BACK_TO_SICOES_ROW,
+    ],
+  };
+
+  return { text, replyMarkup };
+}
+
+export function renderSicoesDepartmentEmpty(depto: string, deptoCode = ''): TemplateResult {
+  const codeLabel = deptoCode ? ` (${deptoCode})` : '';
+  const text =
+    `⚠️ <b>Sin Convocatorias Locales: ${escHtml(depto)}${escHtml(codeLabel)}</b>\n\n` +
+    `Actualmente no hay licitaciones indexadas en la base de datos para el departamento de <b>${escHtml(depto)}</b>.\n\n` +
+    `<blockquote>ℹ️ <b>Estado de Sincronización:</b>\n` +
+    `• El bot opera en modo de consulta y muestreo rápido.\n` +
+    `• Las extracciones se realizan periódicamente desde el scraper local central hacia Neon PostgreSQL.\n` +
+    `• El lote de ${escHtml(depto)} se encuentra en la cola de sincronización central.</blockquote>\n\n` +
+    `Puedes consultar las convocatorias de alcance Nacional o elegir otro departamento:`;
+
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🇧🇴 Ver Convocatorias Nacional', callback_data: 'sicoes_city:ALL' },
+        { text: '🌆 Elegir otro Departamento', callback_data: 'sicoes_menu_city' },
       ],
       BACK_TO_SICOES_ROW,
     ],
@@ -193,15 +225,29 @@ export function renderSicoesSemanticResults(
     };
   }
 
-  const listHtml = results
-    .map(
-      (r) =>
-        `• <code>${escHtml(r.cuce)}</code> [<b>${escHtml(r.estado)}</b>] (${((r.similitud_semantica || 0) * 100).toFixed(1)}% cos)\n` +
+  // Agrupamiento particionado por departamento
+  const deptoGroups = new Map<string, Convocatoria[]>();
+  for (const r of results) {
+    const depto = r.departamento || 'Nacional / Central';
+    if (!deptoGroups.has(depto)) {
+      deptoGroups.set(depto, []);
+    }
+    deptoGroups.get(depto)!.push(r);
+  }
+
+  let listHtml = '';
+  for (const [depto, items] of deptoGroups.entries()) {
+    listHtml += `📍 <b>${escHtml(depto.toUpperCase())} (${items.length} ${items.length === 1 ? 'convocatoria' : 'convocatorias'}):</b>\n`;
+    for (const r of items) {
+      const cosPct = ((r.similitud_semantica || 0) * 100).toFixed(1);
+      const objTrunc = r.objeto.length > 90 ? `${r.objeto.slice(0, 90)}...` : r.objeto;
+      listHtml +=
+        `• <code>${escHtml(r.cuce)}</code> [<b>${escHtml(r.estado)}</b>] (${cosPct}% cos)\n` +
         `  🏢 ${escHtml(r.entidad)}\n` +
-        `  📝 <i>${escHtml(r.objeto.slice(0, 95))}${r.objeto.length > 95 ? '...' : ''}</i>\n` +
-        `  🔗 <a href="${escHtml(r.pliego_url)}">Ver Ficha Oficial SICOES</a>`
-    )
-    .join('\n\n');
+        `  📝 <i>${escHtml(objTrunc)}</i>\n` +
+        `  🔗 <a href="${escHtml(r.pliego_url)}">Ver Ficha Oficial SICOES</a>\n\n`;
+    }
+  }
 
   const topCuce = results[0]?.cuce;
   const replyMarkup: ReplyMarkup = {
@@ -220,7 +266,7 @@ export function renderSicoesSemanticResults(
     text:
       `🎯 <b>Resultados SICOES pgvector:</b> <i>"${escHtml(querySearch)}"</i>\n\n` +
       `${escHtml(llamaSummary)}\n\n` +
-      `📌 <b>Coincidencias indexadas:</b>\n\n${listHtml}`,
+      `📌 <b>Coincidencias indexadas por departamento:</b>\n\n${listHtml.trim()}`,
     replyMarkup,
   };
 }

@@ -8,30 +8,27 @@ import { TemplateResult } from './types';
 
 export function renderMainMenu(firstName: string): TemplateResult {
   const text =
-    `🏛️ <b>SICOES-Miner La Paz</b> ✨\n` +
-    `<i>Bot ciudadano de Minería Web en tiempo real (Neon PostgreSQL + IA)</i>\n\n` +
+    `🏛️ <b>Antigravity WS-DM — Minería Web Bolivia 🇧🇴</b>\n` +
+    `<i>Plataforma ciudadana de datos públicos en tiempo real</i>\n\n` +
     `Hola <b>${escHtml(firstName || 'Ciudadano')}</b> 👋\n\n` +
-    `<blockquote>📌 <b>Comandos del Menú (≡):</b>\n` +
-    `• <code>/start</code> — Información resumida y comandos del bot\n` +
-    `• <code>/sicoes</code> — Licitaciones La Paz, IA pgvector y grafos PageRank/HITS\n` +
-    `• <code>/canasta</code> — Precios Canasta Familiar OAP Bolivia (La Paz y Eje)\n` +
-    `• <code>/salud</code> — Hospitales, clínicas y farmacias OSM + Google Maps\n\n` +
-    `⚡ <b>Atajos directos por texto o GPS:</b>\n` +
-    `• <code>/buscar &lt;tema&gt;</code> | <code>/cuce &lt;código&gt;</code>\n` +
-    `• <code>/canasta &lt;producto&gt;</code> | <code>/farmacia &lt;medicamento&gt;</code>\n` +
-    `• <code>/salud &lt;zona&gt;</code> | Envía tu 📍 <b>ubicación GPS</b></blockquote>\n\n` +
-    `⬇️ <b>Selecciona un módulo o usa el menú inferior:</b>`;
+    `<blockquote>📌 <b>4 Módulos de Información Oficial:</b>\n` +
+    `• SICOES: Licitaciones públicas e IA vectorial (pgvector)\n` +
+    `• Canasta: Precios OAP Bolivia vs Supermercados Hipermaxi\n` +
+    `• Salud: Hospitales, clínicas y farmacias georreferenciadas (OSM)\n` +
+    `• Farmacias: Comparador en vivo Farmacorp vs Farmacias Chávez</blockquote>\n\n` +
+    `⬇️ <b>Selecciona el módulo que deseas consultar:</b>`;
 
   const replyMarkup = {
     inline_keyboard: [
       [
-        { text: '🏛️ SICOES — Licitaciones e IA', callback_data: 'menu_sicoes' },
+        { text: '🏛️ SICOES Licitaciones', callback_data: 'menu_sicoes' },
+        { text: '🛒 Canasta Familiar', callback_data: 'menu_canasta' },
       ],
       [
-        { text: '🛒 Canasta Familiar', callback_data: 'menu_canasta' },
-        { text: '🏥 Centros de Salud', callback_data: 'menu_salud' },
+        { text: '🏥 Centros de Salud (OSM)', callback_data: 'menu_salud' },
+        { text: '💊 Farmacias & Precios', callback_data: 'farmacia_buscar_hint' },
       ],
-      [{ text: '🌐 Abrir Plataforma Web', url: 'https://ws-dm.vercel.app' }],
+      [{ text: '🌐 Abrir Plataforma Web (Dashboard en Vivo)', url: 'https://ws-dm.vercel.app' }],
     ],
   };
 

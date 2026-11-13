@@ -18,16 +18,16 @@ export interface CanastaComparisonItem {
 
 export function renderCanastaMenu(city = 'La Paz', fuente = 'Todas'): TemplateResult {
   const text =
-    `🛒 <b>Módulo Canasta Familiar — Eje Central 🇧🇴</b>\n\n` +
-    `<blockquote><b>Fuentes integradas:</b>\n` +
+    `🛒 <b>Módulo Canasta Familiar — Eje Central Bolivia 🇧🇴</b>\n\n` +
+    `<blockquote><b>Fuentes integradas en paralelo:</b>\n` +
     `1. 🏪 <b>Observatorio Agroambiental (OAP):</b> Mercados populares.\n` +
-    `2. 🛒 <b>Hipermaxi S.A.:</b> Calacoto (LP), Cañoto (SCZ), Blanco Galindo (CBB).\n\n` +
+    `2. 🛒 <b>Hipermaxi S.A.:</b> Supermercados en Calacoto, Cañoto y Blanco Galindo.\n\n` +
     `📍 <b>Ciudad activa:</b> <b>${escHtml(city)}</b> | 🏬 <b>Fuente:</b> <b>${escHtml(fuente)}</b></blockquote>\n\n` +
-    `⬇️ <b>Elige una categoría o herramienta:</b>`;
+    `⬇️ <b>Selecciona una categoría o herramienta:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
-      [{ text: '📈 Comparar Eje Troncal (LP vs SCZ vs CBB)', callback_data: 'canasta_comparar' }],
+      [{ text: '📈 Comparar Eje Troncal (LPZ vs CBB vs SCZ)', callback_data: 'canasta_comparar' }],
       [
         { text: '🥔 Verduras y Tubérculos', callback_data: 'canasta_cat_verduras' },
         { text: '🍗 Carnes y Pollo', callback_data: 'canasta_cat_carnes' },
@@ -37,12 +37,12 @@ export function renderCanastaMenu(city = 'La Paz', fuente = 'Todas'): TemplateRe
         { text: '🥛 Lácteos y Derivados', callback_data: 'canasta_cat_lacteos' },
       ],
       [
-        { text: `🏬 Fuente [${fuente}]`, callback_data: 'canasta_menu_fuente' },
-        { text: `🌆 Ciudad [${city}]`, callback_data: 'canasta_menu_city' },
+        { text: `🏬 Fuente [${fuente} ▾]`, callback_data: 'canasta_menu_fuente' },
+        { text: `🌆 Ciudad [${city} ▾]`, callback_data: 'canasta_menu_city' },
       ],
       [
         { text: '🔄 Actualizar OAP', callback_data: 'canasta_sync' },
-        { text: '🔎 Cómo buscar', callback_data: 'canasta_buscar_hint' },
+        { text: '🔎 Buscar Alimento (/canasta)', callback_data: 'canasta_buscar_hint' },
       ],
       BACK_TO_HOME_ROW,
     ],
@@ -54,7 +54,7 @@ export function renderCanastaMenu(city = 'La Paz', fuente = 'Todas'): TemplateRe
 export function renderCanastaCityMenu(): TemplateResult {
   const text =
     `🏙️ <b>Selecciona la Ciudad para Canasta Familiar:</b>\n\n` +
-    `Monitorea y compara precios en las capitales del Eje Central:`;
+    `Monitorea y compara precios en las capitales y mercados del país:`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
@@ -64,6 +64,10 @@ export function renderCanastaCityMenu(): TemplateResult {
       ],
       [
         { text: '🔴 Cochabamba', callback_data: 'canasta_city:Cochabamba' },
+        { text: '⚪ El Alto', callback_data: 'canasta_city:El Alto' },
+      ],
+      [
+        { text: '🇧🇴 Todas las Plazas (Eje)', callback_data: 'canasta_city:ALL' },
         { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
       ],
       BACK_TO_CANASTA_ROW,
@@ -110,6 +114,56 @@ export function renderCanastaItems(
     };
   }
 
+  // Agrupación dual por producto base para contrastar OAP vs Hipermaxi
+  const productMap = new Map<string, { oap?: CanastaItem; hipermaxi?: CanastaItem }>();
+  for (const item of items) {
+    const norm = item.producto.trim().toLowerCase();
+    if (!productMap.has(norm)) {
+      productMap.set(norm, {});
+    }
+    const entry = productMap.get(norm)!;
+    const isHipermaxi = item.fuente && item.fuente.toLowerCase().includes('hipermaxi');
+    if (isHipermaxi) {
+      if (!entry.hipermaxi) entry.hipermaxi = item;
+    } else {
+      if (!entry.oap) entry.oap = item;
+    }
+  }
+
+  let list = '';
+  for (const [, pair] of productMap.entries()) {
+    const mainItem = pair.oap || pair.hipermaxi;
+    if (!mainItem) continue;
+
+    const depto = mainItem.departamento ? ` (${escHtml(mainItem.departamento)})` : '';
+    list += `• <b>${escHtml(mainItem.producto)}</b>${depto}\n`;
+    if (pair.oap) {
+      list += `  🏪 <b>OAP Mercados:</b> Bs ${pair.oap.precio_bs.toFixed(2)} / ${escHtml(pair.oap.unidad_medida)}\n`;
+    }
+    if (pair.hipermaxi) {
+      list += `  🛒 <b>Hipermaxi:</b>    Bs ${pair.hipermaxi.precio_bs.toFixed(2)} / ${escHtml(pair.hipermaxi.unidad_medida)}\n`;
+    }
+    if (pair.oap && pair.hipermaxi) {
+      const diff = pair.hipermaxi.precio_bs - pair.oap.precio_bs;
+      const pct = ((diff / pair.oap.precio_bs) * 100).toFixed(1);
+      const sign = diff >= 0 ? '+' : '';
+      list += `  📊 <i>Brecha: ${sign}Bs ${diff.toFixed(2)} (${sign}${pct}% en supermercado)</i>\n`;
+    }
+    list += '\n';
+  }
+
+  if (!list.trim()) {
+    list = items
+      .map((p) => {
+        const isHiper = p.fuente && p.fuente.toLowerCase().includes('hipermaxi');
+        const icon = isHiper ? '🛒' : '🏪';
+        const src = p.fuente ? ` <i>[${escHtml(p.fuente)}]</i>` : '';
+        const depto = p.departamento ? ` (${escHtml(p.departamento)})` : '';
+        return `• ${icon} <b>${escHtml(p.producto)}</b>${depto}\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)}${src}`;
+      })
+      .join('\n\n');
+  }
+
   let extraKeyboard: InlineKeyboardButton[][] = [];
   if (options.cityLabel) {
     extraKeyboard = [
@@ -125,18 +179,17 @@ export function renderCanastaItems(
         { text: '📈 Comparar Eje', callback_data: 'canasta_comparar' },
       ],
     ];
+  } else {
+    extraKeyboard = [
+      [
+        { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
+        { text: '🌆 Cambiar Ciudad', callback_data: 'canasta_menu_city' },
+      ],
+    ];
   }
 
-  const list = items
-    .map((p) => {
-      const src = p.fuente ? ` <i>[${escHtml(p.fuente)}]</i>` : '';
-      const depto = p.departamento ? ` (${escHtml(p.departamento)})` : '';
-      return `• <b>${escHtml(p.producto)}</b>${depto}\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)}${src}`;
-    })
-    .join('\n\n');
-
   return {
-    text: `${options.title}\n\n${list}`,
+    text: `${options.title}\n\n${list.trim()}`,
     replyMarkup: {
       inline_keyboard: [...extraKeyboard, BACK_TO_CANASTA_ROW],
     },

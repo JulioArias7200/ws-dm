@@ -264,6 +264,81 @@ export async function hybridSearch(
 }
 
 /**
+ * Consulta la cantidad de convocatorias indexadas para un departamento específico
+ */
+export async function checkConvocatoriasCountByDepartment(depto: string): Promise<number> {
+  try {
+    if (!depto || depto.toUpperCase() === 'ALL') {
+      const [{ count }] = await neonQuery<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM sicoes_convocatorias`
+      );
+      return Number(count || 0);
+    }
+    const [{ count }] = await neonQuery<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM sicoes_convocatorias WHERE UPPER(departamento) = UPPER($1)`,
+      [depto]
+    );
+    return Number(count || 0);
+  } catch (err) {
+    console.warn('[DB] Error verificando conteo por departamento:', err);
+    return 0;
+  }
+}
+
+/**
+ * Búsqueda semántica agrupada/particionada por departamento (evita el monopolio de una sola región)
+ */
+export async function hybridSearchPartitioned(
+  query: string,
+  options: {
+    minSimilarity?: number;
+    limitPerDept?: number;
+    maxTotal?: number;
+  } = {}
+): Promise<Convocatoria[]> {
+  try {
+    const vector = await generateEmbedding(query);
+    if (!vector || vector.length !== 1024) {
+      return hybridSearch(query, undefined, { limit: options.maxTotal || 6 });
+    }
+
+    const minSim = options.minSimilarity ?? 0.20;
+    const limitPerDept = options.limitPerDept ?? 2;
+    const vecLiteral = `[${vector.join(',')}]`;
+
+    const rows = await neonQuery<Record<string, unknown>>(
+      `WITH ranked_by_region AS (
+         SELECT cuce, entidad, tipo_entidad, tipo_contratacion, objeto, modalidad, subasta,
+                departamento, monto_referencial_bs, monto_adjudicado_bs, fecha_publicacion,
+                fecha_presentacion, fecha_adjudicacion, estado, adjudicatario, formularios,
+                contacto, normativa, pliego_url, formulario_500_url,
+                (1 - (embedding <=> $1::vector))::float AS similitud_semantica,
+                ROW_NUMBER() OVER (
+                  PARTITION BY departamento 
+                  ORDER BY (embedding <=> $1::vector) ASC
+                ) as rank_depto
+         FROM sicoes_convocatorias
+         WHERE (1 - (embedding <=> $1::vector)) >= $2
+       )
+       SELECT * FROM ranked_by_region
+       WHERE rank_depto <= $3
+       ORDER BY departamento ASC, similitud_semantica DESC
+       LIMIT $4`,
+      [vecLiteral, minSim, limitPerDept, options.maxTotal || 8]
+    );
+
+    if (rows.length === 0) {
+      return hybridSearch(query, undefined, { limit: options.maxTotal || 6 });
+    }
+
+    return rows.map((r) => mapConvocatoriaRow(r));
+  } catch (err) {
+    console.warn('[DB] Fallback en hybridSearchPartitioned:', err);
+    return hybridSearch(query, undefined, { limit: options.maxTotal || 6 });
+  }
+}
+
+/**
  * Inserta o actualiza una convocatoria real en Neon PostgreSQL
  */
 export async function upsertConvocatoria(item: Convocatoria, embedding?: number[]): Promise<void> {

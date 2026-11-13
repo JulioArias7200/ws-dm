@@ -1,6 +1,6 @@
 import { escHtml } from './formatters';
 import { BACK_TO_HOME_ROW, BACK_TO_SALUD_ROW } from './buttons';
-import { TemplateResult, ReplyMarkup } from './types';
+import { TemplateResult, ReplyMarkup, InlineKeyboardButton } from './types';
 import type { CentroSaludItem, MedicamentoItem, ComparativaMedicamento } from '../canasta-salud';
 
 /**
@@ -9,39 +9,50 @@ import type { CentroSaludItem, MedicamentoItem, ComparativaMedicamento } from '.
 
 export function renderSaludMenu(): TemplateResult {
   const text =
-    `🏥 <b>Módulo Salud & Precios Farmacéuticos — Bolivia</b>\n\n` +
-    `<blockquote><b>Descripción del módulo:</b>\n` +
-    `1. 🗺️ <b>Directorio Médico OSM:</b> Hospitales, clínicas y farmacias georreferenciadas con enlace a Google Maps y distancia GPS.\n` +
-    `2. 💊 <b>Precios de Medicamentos:</b> Catálogo y comparador de precios en vivo entre <b>Farmacorp</b> y <b>Farmacias Chávez</b>.\n\n` +
+    `🏥 <b>Módulo Salud & Precios Farmacéuticos — Bolivia 🇧🇴</b>\n\n` +
+    `<blockquote><b>Servicios integrados en tiempo real:</b>\n` +
+    `1. 🗺️ <b>Directorio OSM:</b> Hospitales, postas y farmacias georreferenciadas con cálculo de distancia GPS.\n` +
+    `2. 💊 <b>Precios Farmacéuticos:</b> Catálogo y comparador en vivo de <b>Farmacorp</b> y <b>Farmacias Chávez</b>.\n\n` +
     `⚡ <b>Atajos rápidos:</b>\n` +
-    `• <code>/farmacia paracetamol</code> | <code>/farmacia ibuprofeno</code>\n` +
+    `• <code>/farmacia paracetamol</code> | <code>/farmacia amoxicilina</code>\n` +
     `• <code>/salud Miraflores</code> | <code>/salud hospital</code>\n` +
     `• Envía tu <b>ubicación GPS (📎 → Ubicación)</b> para ver centros cercanos.</blockquote>\n\n` +
-    `⬇️ <b>Selecciona una opción:</b>`;
+    `⬇️ <b>Selecciona un servicio médico o farmacéutico:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
+      [{ text: '🧭 Centros de Salud Cercanos (GPS)', callback_data: 'salud_buscar_hint' }],
       [
-        { text: '🏥 Hospitales La Paz', callback_data: 'salud_tipo_hospital' },
-        { text: '🩺 Clínicas y Postas', callback_data: 'salud_tipo_clinic' },
-      ],
-      [
+        { text: '🏥 Hospitales y Clínicas', callback_data: 'salud_tipo_hospital' },
         { text: '📍 Farmacias Físicas (OSM)', callback_data: 'salud_tipo_pharmacy' },
-        { text: '🧭 Buscar por GPS', callback_data: 'salud_buscar_hint' },
       ],
+      [{ text: '🔍 Buscar Medicamento (/farmacia)', callback_data: 'farmacia_buscar_hint' }],
       [
-        { text: '💊 Paracetamol (Comparar)', callback_data: 'farmacia_cmp_paracetamol' },
-        { text: '💊 Ibuprofeno (Comparar)', callback_data: 'farmacia_cmp_ibuprofeno' },
-      ],
-      [
-        { text: '🏢 Catálogo Farmacorp', callback_data: 'farmacia_cadena_farmacorp' },
-        { text: '🏢 Catálogo Chávez', callback_data: 'farmacia_cadena_chavez' },
+        { text: '🟢 Catálogo Farmacorp', callback_data: 'farmacia_cadena_farmacorp' },
+        { text: '🔵 Catálogo Chávez', callback_data: 'farmacia_cadena_chavez' },
       ],
       BACK_TO_HOME_ROW,
     ],
   };
 
   return { text, replyMarkup };
+}
+
+export function renderFarmaciaBuscarHint(): TemplateResult {
+  return {
+    text:
+      `🔍 <b>Búsqueda de Medicamentos — Comparador Farmacéutico</b>\n\n` +
+      `Compara precios en tiempo real entre <b>Farmacorp</b> y <b>Farmacias Chávez</b>.\n\n` +
+      `<blockquote>💡 <b>¿Cómo realizar una búsqueda?</b>\n` +
+      `1. Escribe el comando seguido del medicamento:\n` +
+      `   • <code>/farmacia paracetamol</code>\n` +
+      `   • <code>/farmacia amoxicilina 500</code>\n` +
+      `   • <code>/farmacia ibuprofeno 400</code>\n` +
+      `   • <code>/farmacia losartan</code>\n\n` +
+      `2. O escribe directamente el nombre en el chat.\n` +
+      `Obtendrás precios, laboratorios, presentaciones y enlaces directos de compra.</blockquote>`,
+    replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
+  };
 }
 
 export function renderCentrosSaludList(
@@ -103,16 +114,7 @@ export function renderMedicamentosComparativa(
   comp?: ComparativaMedicamento
 ): TemplateResult {
   if (!searchTerm || !searchTerm.trim() || !comp) {
-    return {
-      text:
-        `💊 <b>Comparador de Medicamentos — Farmacorp vs Farmacias Chávez</b>\n\n` +
-        `Escribe el nombre del medicamento o principio activo para comparar precios:\n` +
-        `• <code>/farmacia paracetamol</code>\n` +
-        `• <code>/farmacia ibuprofeno</code>\n` +
-        `• <code>/farmacia amoxicilina</code>\n` +
-        `• <code>/farmacia aspirina</code>`,
-      replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
-    };
+    return renderFarmaciaBuscarHint();
   }
 
   if (comp.items.length === 0) {
@@ -131,17 +133,19 @@ export function renderMedicamentosComparativa(
     text +=
       `<blockquote>🎯 <b>Resumen de Oportunidad:</b>\n` +
       `• Cadena con menor precio: <b>${escHtml(mejorCadena)}</b>\n` +
-      `• Rango de precios: <b>Bs ${precioMin.toFixed(2)}</b> — <b>Bs ${precioMax.toFixed(2)}</b>\n` +
+      `• Rango registrado: <b>Bs ${precioMin.toFixed(2)}</b> — <b>Bs ${precioMax.toFixed(2)}</b>\n` +
       (ahorroBs > 0 ? `• Diferencia / Ahorro potencial: <b>Bs ${ahorroBs.toFixed(2)}</b>\n` : '') +
       `</blockquote>\n\n`;
   }
 
   text += `📋 <b>Opciones encontradas (${comp.items.length}):</b>\n\n`;
   for (const item of comp.items) {
-    const icon = item.cadena.toLowerCase().includes('farmacorp') ? '🟢' : '🔵';
+    const isFarmacorp = item.cadena.toLowerCase().includes('farmacorp');
+    const icon = isFarmacorp ? '🟢' : '🔵';
+    const linkText = isFarmacorp ? 'Ver en Farmacorp' : 'Ver en Farmacias Chávez';
     const desc = item.descuento_pct ? ` (🏷️ -${item.descuento_pct}%)` : '';
     const lab = item.laboratorio && item.laboratorio !== 'No especificado' ? ` [${escHtml(item.laboratorio)}]` : '';
-    const link = item.enlace ? ` — <a href="${escHtml(item.enlace)}">Ver</a>` : '';
+    const link = item.enlace ? ` — 🔗 <a href="${escHtml(item.enlace)}">${linkText}</a>` : '';
 
     text +=
       `${icon} <b>${escHtml(item.cadena)}</b>: Bs <b>${item.precio_bs.toFixed(2)}</b>${desc}\n` +
@@ -149,12 +153,25 @@ export function renderMedicamentosComparativa(
       `   📦 ${escHtml(item.presentacion || 'Unidad')}${link}\n\n`;
   }
 
-  return { text, replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] } };
+  const replyMarkup: ReplyMarkup = {
+    inline_keyboard: [
+      [
+        { text: '🔍 Buscar otro Medicamento', callback_data: 'farmacia_buscar_hint' },
+        { text: '🧭 Farmacias Físicas (OSM)', callback_data: 'salud_tipo_pharmacy' },
+      ],
+      BACK_TO_SALUD_ROW,
+    ],
+  };
+
+  return { text: text.trim(), replyMarkup };
 }
 
-export function renderMedicamentosCatalogo(
+export function renderMedicamentosCatalogoPaginado(
   cadena: string,
-  items: MedicamentoItem[]
+  items: MedicamentoItem[],
+  page: number,
+  totalPages: number,
+  totalCount?: number
 ): TemplateResult {
   if (items.length === 0) {
     return {
@@ -163,18 +180,49 @@ export function renderMedicamentosCatalogo(
     };
   }
 
-  let text = `🏢 <b>Catálogo ${escHtml(cadena)} — Muestra de Precios:</b>\n\n`;
-  for (const m of items) {
+  const cadenaKey = cadena.toLowerCase().includes('farmacorp') ? 'farmacorp' : 'chavez';
+  const icon = cadenaKey === 'farmacorp' ? '🟢' : '🔵';
+  const countLabel = totalCount ? ` — ${totalCount} productos` : '';
+
+  let text = `${icon} <b>Catálogo ${escHtml(cadena)} (Pág. ${page} de ${totalPages}${countLabel}):</b>\n\n`;
+
+  items.forEach((m, idx) => {
+    const itemNum = (page - 1) * 5 + idx + 1;
     const desc = m.descuento_pct ? ` 🏷️ <i>-${m.descuento_pct}%</i>` : '';
     const lab = m.laboratorio && m.laboratorio !== 'No especificado' ? ` | 🏭 ${escHtml(m.laboratorio)}` : '';
-    const link = m.enlace ? ` — <a href="${escHtml(m.enlace)}">Ver online</a>` : '';
+    const link = m.enlace ? ` — 🔗 <a href="${escHtml(m.enlace)}">Ver online</a>` : '';
     text +=
-      `• <b>${escHtml(m.producto)}</b>\n` +
-      `  💵 <b>Bs ${m.precio_bs.toFixed(2)}</b>${desc}${lab}\n` +
-      `  📦 Presentación: ${escHtml(m.presentacion || 'Unidad')}${link}\n\n`;
+      `${itemNum}. <b>${escHtml(m.producto)}</b>\n` +
+      `   💵 <b>Bs ${m.precio_bs.toFixed(2)}</b>${desc}${lab}\n` +
+      `   📦 ${escHtml(m.presentacion || 'Unidad')}${link}\n\n`;
+  });
+
+  const navRow: InlineKeyboardButton[] = [];
+  if (page > 1) {
+    navRow.push({ text: '◀️ Anterior', callback_data: `farmacia_cat:${cadenaKey}:${page - 1}` });
+  } else {
+    navRow.push({ text: '◀️ Inicio', callback_data: `farmacia_cadena_${cadenaKey}` });
   }
 
-  return { text, replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] } };
+  navRow.push({ text: `Pág ${page}/${totalPages}`, callback_data: 'noop' });
+
+  if (page < totalPages) {
+    navRow.push({ text: 'Siguiente ▶️', callback_data: `farmacia_cat:${cadenaKey}:${page + 1}` });
+  }
+
+  return {
+    text: text.trim(),
+    replyMarkup: {
+      inline_keyboard: [navRow, BACK_TO_SALUD_ROW],
+    },
+  };
+}
+
+export function renderMedicamentosCatalogo(
+  cadena: string,
+  items: MedicamentoItem[]
+): TemplateResult {
+  return renderMedicamentosCatalogoPaginado(cadena, items, 1, 1, items.length);
 }
 
 export function renderSaludBuscarHint(): TemplateResult {

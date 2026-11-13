@@ -180,11 +180,15 @@ export async function getCanastaPrecios(options: {
       await syncCanastaOapToNeon();
     }
 
-    const depto = (options.departamento || 'LA PAZ').toUpperCase();
-    const params: unknown[] = [depto];
-    const conditions = [`UPPER(departamento) = $1`];
+    const params: unknown[] = [];
+    const conditions: string[] = [];
 
-    if (options.fuente) {
+    if (options.departamento && options.departamento.toUpperCase() !== 'ALL') {
+      params.push(options.departamento.toUpperCase());
+      conditions.push(`UPPER(departamento) = $${params.length}`);
+    }
+
+    if (options.fuente && options.fuente.toLowerCase() !== 'todas' && options.fuente.toLowerCase() !== 'all') {
       params.push(`%${options.fuente}%`);
       conditions.push(`fuente ILIKE $${params.length}`);
     }
@@ -199,15 +203,17 @@ export async function getCanastaPrecios(options: {
       conditions.push(`producto ILIKE $${params.length}`);
     }
 
-    const limitVal = Math.min(Math.max(Number(options.limit || 12), 1), 30);
+    const limitVal = Math.min(Math.max(Number(options.limit || 16), 1), 40);
     params.push(limitVal);
 
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const rows = await neonQuery<Record<string, unknown>>(
-      `SELECT DISTINCT ON (producto)
+      `SELECT DISTINCT ON (producto, fuente)
               fecha::text AS fecha, departamento, producto, categoria, unidad_medida, precio_bs::float AS precio_bs, fuente
        FROM canasta_precios
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY producto ASC, fecha DESC
+       ${where}
+       ORDER BY producto ASC, fuente ASC, fecha DESC
        LIMIT $${params.length}`,
       params
     );
@@ -515,6 +521,89 @@ export async function getMedicamentosPrecios(options: {
   } catch (err) {
     console.warn('[FARMACIAS] Error consultando medicamentos_precios:', err);
     return [];
+  }
+}
+
+/**
+ * Consulta catálogo de medicamentos paginado en bloques de 5 elementos
+ */
+export async function getMedicamentosPreciosPaginado(options: {
+  cadena?: string;
+  query?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{
+  items: MedicamentoItem[];
+  total: number;
+  page: number;
+  totalPages: number;
+}> {
+  try {
+    const page = Math.max(1, options.page || 1);
+    const pageSize = Math.max(1, options.pageSize || 5);
+    const offset = (page - 1) * pageSize;
+
+    const countParams: unknown[] = [];
+    const conditions: string[] = ['disponible = true'];
+
+    if (options.cadena) {
+      countParams.push(`%${options.cadena}%`);
+      conditions.push(`cadena ILIKE $${countParams.length}`);
+    }
+
+    if (options.query) {
+      countParams.push(`%${options.query}%`);
+      conditions.push(`(producto ILIKE $${countParams.length} OR laboratorio ILIKE $${countParams.length} OR categoria ILIKE $${countParams.length})`);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const [{ total }] = await neonQuery<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM medicamentos_precios ${where}`,
+      countParams
+    );
+
+    const queryParams = [...countParams, pageSize, offset];
+
+    const rows = await neonQuery<Record<string, unknown>>(
+      `SELECT id, fecha::text AS fecha, departamento, cadena, producto, laboratorio, categoria,
+              presentacion, precio_bs::float AS precio_bs, precio_anterior_bs::float AS precio_anterior_bs,
+              descuento_pct::float AS descuento_pct, enlace, imagen, disponible
+       FROM medicamentos_precios
+       ${where}
+       ORDER BY precio_bs ASC
+       LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`,
+      queryParams
+    );
+
+    const items: MedicamentoItem[] = rows.map((r) => ({
+      id: Number(r.id),
+      fecha: String(r.fecha).slice(0, 10),
+      departamento: String(r.departamento),
+      cadena: String(r.cadena),
+      producto: String(r.producto),
+      laboratorio: r.laboratorio ? String(r.laboratorio) : null,
+      categoria: r.categoria ? String(r.categoria) : null,
+      presentacion: r.presentacion ? String(r.presentacion) : null,
+      precio_bs: Number(r.precio_bs),
+      precio_anterior_bs: r.precio_anterior_bs != null ? Number(r.precio_anterior_bs) : null,
+      descuento_pct: r.descuento_pct != null ? Number(r.descuento_pct) : null,
+      enlace: r.enlace ? String(r.enlace) : null,
+      imagen: r.imagen ? String(r.imagen) : null,
+      disponible: Boolean(r.disponible),
+    }));
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    return {
+      items,
+      total,
+      page,
+      totalPages,
+    };
+  } catch (err) {
+    console.warn('[FARMACIAS] Error consultando catalogo paginado:', err);
+    return { items: [], total: 0, page: 1, totalPages: 1 };
   }
 }
 

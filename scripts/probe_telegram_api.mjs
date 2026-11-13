@@ -89,8 +89,8 @@ async function run() {
       },
     });
 
-    // 4. Callback: sicoes_menu_city
-    await testEndpoint('Callback: sicoes_menu_city (Selector Ciudad SICOES)', {
+    // 4. Callback: sicoes_menu_city (Selector 9 Departamentos SICOES)
+    await testEndpoint('Callback: sicoes_menu_city (Selector 9 Departamentos)', {
       callback_query: {
         id: 'cb_1',
         from: { id: 777999, first_name: 'Julio' },
@@ -99,27 +99,37 @@ async function run() {
       },
     });
 
-    // 5. Callback: sicoes_city:La Paz
-    await testEndpoint('Callback: sicoes_city:La Paz', {
+    // 5. Callback: sicoes_city:Tarija (Departamento Vacío -> Estado de Sincronización)
+    await testEndpoint('Callback: sicoes_city:Tarija (Departamento Vacío / Sincronización)', {
       callback_query: {
-        id: 'cb_2',
+        id: 'cb_2a',
+        from: { id: 777999, first_name: 'Julio' },
+        message: { message_id: 10, chat: { id: 777999, type: 'private' } },
+        data: 'sicoes_city:Tarija',
+      },
+    });
+
+    // 6. Callback: sicoes_city:La Paz (Departamento con Convocatorias)
+    await testEndpoint('Callback: sicoes_city:La Paz (Convocatorias Activas)', {
+      callback_query: {
+        id: 'cb_2b',
         from: { id: 777999, first_name: 'Julio' },
         message: { message_id: 10, chat: { id: 777999, type: 'private' } },
         data: 'sicoes_city:La Paz',
       },
     });
 
-    // 6. Callback: sicoes_desiertas
-    await testEndpoint('Callback: sicoes_desiertas', {
-      callback_query: {
-        id: 'cb_3',
+    // 7. /buscar auditoria (Búsqueda Semántica Particionada por Departamento)
+    await testEndpoint('/buscar auditoria (Búsqueda Semántica Particionada)', {
+      message: {
+        message_id: 25,
+        chat: { id: 777999, type: 'private' },
         from: { id: 777999, first_name: 'Julio' },
-        message: { message_id: 10, chat: { id: 777999, type: 'private' } },
-        data: 'sicoes_desiertas',
+        text: '/buscar auditoria',
       },
     });
 
-    // 7. /canasta
+    // 8. /canasta
     await testEndpoint('/canasta (Menú Canasta)', {
       message: {
         message_id: 3,
@@ -129,27 +139,27 @@ async function run() {
       },
     });
 
-    // 8. Callback: canasta_menu_fuente
-    await testEndpoint('Callback: canasta_menu_fuente (Selector Fuente)', {
+    // 9. Callback: canasta_cat_verduras (Comparativa Dual OAP + Hipermaxi)
+    await testEndpoint('Callback: canasta_cat_verduras (Dual OAP + Hipermaxi)', {
       callback_query: {
-        id: 'cb_4',
+        id: 'cb_4a',
         from: { id: 777999, first_name: 'Julio' },
         message: { message_id: 10, chat: { id: 777999, type: 'private' } },
-        data: 'canasta_menu_fuente',
+        data: 'canasta_cat_verduras',
       },
     });
 
-    // 9. Callback: canasta_fuente:hipermaxi
-    await testEndpoint('Callback: canasta_fuente:hipermaxi (Solo Supermercado)', {
+    // 10. Callback: canasta_menu_city (Selector Todas las Ciudades)
+    await testEndpoint('Callback: canasta_menu_city (Selector Ciudades Canasta)', {
       callback_query: {
-        id: 'cb_5',
+        id: 'cb_4b',
         from: { id: 777999, first_name: 'Julio' },
         message: { message_id: 10, chat: { id: 777999, type: 'private' } },
-        data: 'canasta_fuente:hipermaxi',
+        data: 'canasta_menu_city',
       },
     });
 
-    // 10. Callback: canasta_comparar
+    // 11. Callback: canasta_comparar (Eje Troncal)
     await testEndpoint('Callback: canasta_comparar (Eje Troncal)', {
       callback_query: {
         id: 'cb_6',
@@ -159,7 +169,7 @@ async function run() {
       },
     });
 
-    // 11. /salud
+    // 12. /salud
     await testEndpoint('/salud (Menú Salud & Farmacias)', {
       message: {
         message_id: 4,
@@ -169,37 +179,47 @@ async function run() {
       },
     });
 
-    // 12. Callback: farmacia_cmp_paracetamol
-    await testEndpoint('Callback: farmacia_cmp_paracetamol (Farmacorp vs Chávez)', {
+    // 13. Callback: farmacia_buscar_hint (Guía Interactiva de Búsqueda)
+    await testEndpoint('Callback: farmacia_buscar_hint (Guía de Búsqueda)', {
       callback_query: {
-        id: 'cb_7',
+        id: 'cb_7a',
         from: { id: 777999, first_name: 'Julio' },
         message: { message_id: 10, chat: { id: 777999, type: 'private' } },
-        data: 'farmacia_cmp_paracetamol',
+        data: 'farmacia_buscar_hint',
       },
     });
 
-    // 13. /farmacia ibuprofeno
-    await testEndpoint('Comando: /farmacia ibuprofeno', {
+    // 14. /farmacia paracetamol (Comparativa Dual con Enlaces Directos)
+    await testEndpoint('Comando: /farmacia paracetamol (Dual con Enlaces)', {
       message: {
         message_id: 5,
         chat: { id: 777999, type: 'private' },
         from: { id: 777999, first_name: 'Julio' },
-        text: '/farmacia ibuprofeno',
+        text: '/farmacia paracetamol',
       },
     });
 
-    // 14. Callback: farmacia_cadena_chavez
-    await testEndpoint('Callback: farmacia_cadena_chavez (Catálogo con Labs)', {
+    // 15. Callback: farmacia_cadena_chavez (Catálogo Paginado Pág 1)
+    await testEndpoint('Callback: farmacia_cadena_chavez (Catálogo Pág 1 - 5 ítems)', {
       callback_query: {
-        id: 'cb_8',
+        id: 'cb_8a',
         from: { id: 777999, first_name: 'Julio' },
         message: { message_id: 10, chat: { id: 777999, type: 'private' } },
         data: 'farmacia_cadena_chavez',
       },
     });
 
-    // 15. Ubicación GPS
+    // 16. Callback: farmacia_cat:chavez:2 (Paginación Catálogo Pág 2)
+    await testEndpoint('Callback: farmacia_cat:chavez:2 (Paginación Pág 2)', {
+      callback_query: {
+        id: 'cb_8b',
+        from: { id: 777999, first_name: 'Julio' },
+        message: { message_id: 10, chat: { id: 777999, type: 'private' } },
+        data: 'farmacia_cat:chavez:2',
+      },
+    });
+
+    // 17. Ubicación GPS
     await testEndpoint('Mensaje GPS (-16.505, -68.130 La Paz)', {
       message: {
         message_id: 6,
@@ -210,7 +230,7 @@ async function run() {
     });
 
     console.log('\n==================================================');
-    console.log('🎉 TODAS LAS 15 PRUEBAS END-TO-END COMPLETADAS CON ÉXITO');
+    console.log('🎉 TODAS LAS 17 PRUEBAS END-TO-END COMPLETADAS CON ÉXITO');
     console.log('==================================================');
   } finally {
     console.log('\n🛑 Deteniendo servidor Next.js...');
