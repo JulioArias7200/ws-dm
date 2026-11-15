@@ -43,19 +43,44 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const BASE_URL = 'https://www.farmaciaschavez.com.bo';
 const BACKUP_JSON_PATH = path.resolve(ROOT_DIR, 'data_scraped_chavez.json');
 
-// Lista de medicamentos y categorías esenciales de la canasta médica boliviana
+// Categorías oficiales y promociones de Farmacias Chávez
+const CHAVEZ_OFFICIAL_CATEGORIES = [
+  // Promociones y Campañas Especiales
+  { slug: 'black-friday', id: '119', nombre: 'Black Friday' },
+  { slug: 'mundo-bebe', id: '120', nombre: 'Mundo Bebé' },
+  { slug: 'fluidex', id: '121', nombre: 'Fluidex' },
+  { slug: 'beauty-party', id: '117', nombre: 'Beauty Party' },
+  { slug: 'lunes-de-chavez', id: '118', nombre: 'Lunes de Chávez' },
+  { slug: 'chavez-plus', id: '116', nombre: 'Chávez Plus' },
+  { slug: 'canasta-del-ahorro-y-bienestar', id: '113', nombre: 'Canasta del Ahorro y Bienestar' },
+  { slug: 'productos-garantizados', id: '115', nombre: 'Productos Garantizados' },
+  { slug: 'hecho-en-bolivia', id: '123', nombre: 'Hecho en Bolivia' },
+
+  // Categorías Troncales
+  { slug: 'medicamentos', id: '109', nombre: 'Medicamentos' },
+  { slug: 'belleza', id: '102', nombre: 'Belleza' },
+  { slug: 'alimentos-y-bebidas', id: '101', nombre: 'Alimentos y Bebidas' },
+  { slug: 'cuidado-e-higiene', id: '104', nombre: 'Cuidado e Higiene' },
+  { slug: 'estacionales', id: '105', nombre: 'Estacionales' },
+  { slug: 'insumos-medicos', id: '107', nombre: 'Insumos Médicos' },
+  { slug: 'nutricion-saludable', id: '110', nombre: 'Nutrición Saludable' },
+  { slug: 'suplementos-y-vitaminas', id: '112', nombre: 'Suplementos y Vitaminas' }
+];
+
+// Lista ampliada y exhaustiva de medicamentos y categorías esenciales de la canasta médica boliviana
 const ESSENTIAL_MEDICINES = [
-  'paracetamol',
-  'ibuprofeno',
-  'crema',
-  'aspirina',
-  'amoxicilina',
-  'omeprazol',
-  'losartan',
-  'antigripal',
-  'azitromicina',
-  'complejo b',
-  'alcohol'
+  // Analgésicos y Antiinflamatorios
+  'paracetamol', 'ibuprofeno', 'aspirina', 'diclofenaco', 'ketorolaco', 'naproxeno', 'tramadol', 'meloxicam', 'clonixinato',
+  // Antibióticos y Antivirales
+  'amoxicilina', 'azitromicina', 'ciprofloxacina', 'cefalexina', 'penicilina', 'aciclovir', 'cotrimoxazol',
+  // Respiratorio y Antigripales
+  'antigripal', 'ambroxol', 'loratadina', 'clorfenamina', 'salbutamol', 'jarabe', 'tos', 'fluticasona',
+  // Gastrointestinales y Antiácidos
+  'omeprazol', 'antiacido', 'bismuto', 'domperidona', 'metoclopramida', 'probioticos', 'suero', 'ranitidina',
+  // Cardiovasculares y Metabólicos
+  'losartan', 'enalapril', 'metformina', 'glibenclamida', 'amlodipina', 'atorvastatina', 'hidroclorotiazida',
+  // Botiquín, Dermatología y Cuidado
+  'alcohol', 'crema', 'gasa', 'venda', 'algodon', 'povidona', 'bloqueador solar', 'panales', 'complejo b', 'vitamina c', 'calcio', 'zinc'
 ];
 
 // Diccionario exhaustivo de laboratorios y marcas farmacéuticas presentes en Bolivia
@@ -87,23 +112,35 @@ function parseArgs() {
   const options = {
     search: '',
     essentials: false,
+    categories: false,
+    category: '', // '102', 'belleza', '109', '119', etc.
+    pages: 0, // 0 = autodetección de todas las páginas de la categoría
+    exhaustive: false,
     details: false,
     city: 'La Paz',
     limit: 0,
     dryRun: false,
     headless: true,
-    delayMs: 1500
+    delayMs: 2000
   };
 
   for (const arg of args) {
     if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--no-headless' || arg === '--headed') options.headless = false;
     else if (arg === '--essentials') options.essentials = true;
+    else if (arg === '--categories' || arg === '--all-categories') options.categories = true;
+    else if (arg === '--exhaustive' || arg === '--all') {
+      options.exhaustive = true;
+      options.essentials = true;
+      options.categories = true;
+    }
     else if (arg === '--details' || arg === '--with-details') options.details = true;
     else if (arg.startsWith('--search=')) options.search = arg.split('=')[1].trim();
+    else if (arg.startsWith('--category=')) options.category = arg.split('=')[1].trim();
+    else if (arg.startsWith('--pages=')) options.pages = parseInt(arg.split('=')[1], 10) || 0;
     else if (arg.startsWith('--city=')) options.city = arg.split('=')[1].trim();
     else if (arg.startsWith('--limit=')) options.limit = parseInt(arg.split('=')[1], 10) || 0;
-    else if (arg.startsWith('--delay=')) options.delayMs = parseInt(arg.split('=')[1], 10) || 1500;
+    else if (arg.startsWith('--delay=')) options.delayMs = parseInt(arg.split('=')[1], 10) || 2000;
   }
 
   return options;
@@ -144,10 +181,19 @@ function parsePriceBs(rawText) {
   if (!clean) return null;
 
   let normalized = clean;
-  if (normalized.includes(',') && !normalized.includes('.')) {
-    normalized = normalized.replace(',', '.');
-  } else if (normalized.includes('.') && normalized.includes(',')) {
-    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  if (normalized.includes(',') && normalized.includes('.')) {
+    if (normalized.indexOf(',') < normalized.indexOf('.')) {
+      normalized = normalized.replace(/,/g, ''); // "1,099.00" -> "1099.00"
+    } else {
+      normalized = normalized.replace(/\./g, '').replace(',', '.'); // "1.099,00" -> "1099.00"
+    }
+  } else if (normalized.includes(',')) {
+    const parts = normalized.split(',');
+    if (parts.length === 2 && parts[1].length === 3 && parts[0].length >= 1) {
+      normalized = normalized.replace(',', '');
+    } else {
+      normalized = normalized.replace(',', '.');
+    }
   }
 
   const num = parseFloat(normalized);
@@ -289,48 +335,144 @@ async function scrapeChavez(browser, options) {
   });
 
   const allItems = [];
-  const searchTerms = options.search
-    ? [options.search]
-    : options.essentials
-    ? ESSENTIAL_MEDICINES
-    : ['paracetamol', 'ibuprofeno'];
+  const targets = [];
+
+  // Agregar categorías oficiales o categoría específica
+  if (options.category) {
+    const targetCat = CHAVEZ_OFFICIAL_CATEGORIES.find(
+      (c) => c.slug.toLowerCase() === options.category.toLowerCase() || c.id === options.category
+    );
+    if (targetCat) {
+      targets.push({
+        type: 'categoria',
+        name: targetCat.nombre,
+        slug: targetCat.slug,
+        id: targetCat.id,
+        url: `${BASE_URL}/ca/${targetCat.slug}/${targetCat.id}`,
+        categoriaNombre: targetCat.nombre
+      });
+    } else {
+      const cleanSlug = options.category.replace(/[^a-zA-Z0-9_-]/g, '');
+      targets.push({
+        type: 'categoria',
+        name: cleanSlug,
+        slug: cleanSlug,
+        id: cleanSlug,
+        url: `${BASE_URL}/ca/${cleanSlug}/${cleanSlug}`,
+        categoriaNombre: cleanSlug
+      });
+    }
+  } else if (options.categories || options.exhaustive) {
+    for (const cat of CHAVEZ_OFFICIAL_CATEGORIES) {
+      targets.push({
+        type: 'categoria',
+        name: cat.nombre,
+        slug: cat.slug,
+        id: cat.id,
+        url: `${BASE_URL}/ca/${cat.slug}/${cat.id}`,
+        categoriaNombre: cat.nombre
+      });
+    }
+  }
+
+  // Agregar términos de búsqueda de fármacos (si no se pidió solo una categoría)
+  if (!options.category || options.search) {
+    const searchTerms = options.search
+      ? [options.search]
+      : options.essentials || options.exhaustive
+      ? ESSENTIAL_MEDICINES
+      : options.category ? [] : ['paracetamol', 'ibuprofeno'];
+
+    for (const term of searchTerms) {
+      targets.push({
+        type: 'busqueda',
+        name: term,
+        url: `${BASE_URL}/search?name=${encodeURIComponent(term)}`,
+        categoriaNombre: 'Fármacos'
+      });
+    }
+  }
 
   const todayStr = new Date().toISOString().split('T')[0];
+  let lastReportTime = 0;
 
   try {
-    for (const term of searchTerms) {
-      const searchUrl = `${BASE_URL}/search?name=${encodeURIComponent(term)}`;
-      console.log(`🌐 Buscando fármaco '${term}' en Farmacias Chávez...`);
-      console.log(`   URL: ${searchUrl}`);
+    for (let i = 0; i < targets.length; i++) {
+      if (options.limit > 0 && allItems.length >= options.limit) break;
+      const tgt = targets[i];
 
-      const res = await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
-      if (!res || res.status() >= 400) {
-        console.warn(`  ⚠️ Respuesta HTTP ${res ? res.status() : 'error'} para '${term}'.`);
-        continue;
-      }
-
-      // Esperar a que el cliente Next.js / Instaleap hidrate las tarjetas de producto
       try {
-        await page.waitForSelector('a[href^="/p/"]', { timeout: 8000 });
-      } catch (e) {
-        // Fallback: esperar un momento por si no hay productos
-        await page.waitForTimeout(2500);
-      }
+        if (tgt.type === 'categoria') {
+          // 1. Obtener primera página y detectar total de páginas en ant-pagination
+          const firstPageUrl = `${BASE_URL}/ca/${tgt.slug}/${tgt.id}?currentPage=1`;
+          const res = await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+          if (!res || res.status() >= 400) {
+            console.warn(`  ⚠️ Respuesta HTTP ${res ? res.status() : 'error'} para categoría '${tgt.name}'.`);
+            continue;
+          }
 
-      // Verificación de bloqueo anti-bot
-      const bodyText = await page.textContent('body');
-      if (bodyText.includes('Attention Required') || bodyText.includes('Cloudflare') || bodyText.includes('challenge')) {
-        console.warn('  ⚠️ Bloqueo anti-bot detectado. Abortando búsqueda según política anti-CAPTCHA.');
-        break;
-      }
+          await page.waitForSelector('a[href^="/p/"]', { timeout: 8000 }).catch(() => null);
 
-      const cards = await extractCardsFromChavezPage(page, { searchTerm: term, city: options.city });
-      console.log(`  ↳ Extraídos ${cards.length} productos coincidentes para '${term}'.`);
-      allItems.push(...cards);
+          // Detectar total de páginas desde el componente Simple Pagination (< [ 1 ] / 19 >)
+          const pagerText = await page.$eval(
+            '.ant-pagination-simple-pager, ul.ant-pagination',
+            (el) => el.textContent || ''
+          ).catch(() => '');
+          const match = pagerText.match(/\/\s*(\d+)/);
+          let totalPages = match ? parseInt(match[1], 10) : 1;
+          if (options.pages > 0) {
+            totalPages = Math.min(totalPages, options.pages);
+          }
 
-      if (options.limit > 0 && allItems.length >= options.limit) {
-        console.log(`  ℹ️ Límite general de ${options.limit} alcanzado.`);
-        break;
+          console.log(`\n📑 [PAGINACIÓN CHÁVEZ]: Categoría '${tgt.name}' -> ${totalPages} página(s) totales.`);
+
+          for (let p = 1; p <= totalPages; p++) {
+            if (options.limit > 0 && allItems.length >= options.limit) break;
+            const currentUrl = `${BASE_URL}/ca/${tgt.slug}/${tgt.id}?currentPage=${p}`;
+
+            if (p > 1) {
+              await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+              await page.waitForSelector('a[href^="/p/"]', { timeout: 8000 }).catch(() => null);
+            }
+
+            // Scroll progresivo para hidratar tarjetas
+            for (let s = 0; s < 3; s++) {
+              await page.evaluate(() => window.scrollBy(0, 800));
+              await page.waitForTimeout(400);
+            }
+
+            const cards = await extractCardsFromChavezPage(page, { searchTerm: tgt.name, city: options.city });
+            allItems.push(...cards);
+
+            console.log(`📄 [PÁGINAS PROCESADAS]: ${tgt.name} (Pág. ${p}/${totalPages}) -> ${cards.length} detectados (Acumulado: ${allItems.length})`);
+            if (cards.length === 0) break;
+            await page.waitForTimeout(options.delayMs);
+          }
+        } else {
+          // Búsqueda simple
+          const pageUrl = tgt.url;
+          const res = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+          if (!res || res.status() >= 400) {
+            console.warn(`  ⚠️ Respuesta HTTP ${res ? res.status() : 'error'} para '${tgt.name}'.`);
+            continue;
+          }
+
+          await page.waitForSelector('a[href^="/p/"]', { timeout: 8000 }).catch(() => null);
+
+          for (let s = 0; s < 3; s++) {
+            await page.evaluate(() => window.scrollBy(0, 800));
+            await page.waitForTimeout(600);
+          }
+
+          const cards = await extractCardsFromChavezPage(page, { searchTerm: tgt.name, city: options.city });
+          allItems.push(...cards);
+
+          console.log(`\n📄 [PÁGINAS PROCESADAS]: BÚSQUEDA: ${tgt.name} (${i + 1}/${targets.length}) -> ${pageUrl}`);
+          console.log(`🔍 [PRODUCTOS ANALIZADOS]: ${cards.length} detectados (Acumulado: ${allItems.length})`);
+          await page.waitForTimeout(options.delayMs);
+        }
+      } catch (err) {
+        console.warn(`  ⚠️ Error al procesar ${tgt.name}: ${err.message}`);
       }
     }
 
@@ -441,8 +583,11 @@ async function syncToNeon(neonUrl, records) {
       precio_bs = EXCLUDED.precio_bs,
       precio_anterior_bs = EXCLUDED.precio_anterior_bs,
       descuento_pct = EXCLUDED.descuento_pct,
-      enlace = EXCLUDED.enlace,
-      imagen = EXCLUDED.imagen,
+      enlace = COALESCE(EXCLUDED.enlace, medicamentos_precios.enlace),
+      imagen = CASE
+        WHEN medicamentos_precios.imagen LIKE 'farmacias/%' THEN medicamentos_precios.imagen
+        ELSE COALESCE(EXCLUDED.imagen, medicamentos_precios.imagen)
+      END,
       disponible = EXCLUDED.disponible,
       updated_at = NOW();
   `;
@@ -466,12 +611,54 @@ async function syncToNeon(neonUrl, records) {
         r.disponible
       ]);
       inserted++;
+
+      // Sincronización en catálogo maestro e histórico time-series
+      try {
+        const skuId = `chavez-${r.producto.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 80)}`;
+        await neonQuery(neonUrl, `
+          INSERT INTO catalogo_productos_master (
+            sku_id, producto, cadena, departamento, categoria, laboratorio, presentacion, enlace_canonica, imagen, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+          ON CONFLICT (sku_id) DO UPDATE SET
+            producto = EXCLUDED.producto,
+            categoria = EXCLUDED.categoria,
+            laboratorio = EXCLUDED.laboratorio,
+            presentacion = EXCLUDED.presentacion,
+            enlace_canonica = COALESCE(EXCLUDED.enlace_canonica, catalogo_productos_master.enlace_canonica),
+            imagen = COALESCE(EXCLUDED.imagen, catalogo_productos_master.imagen),
+            updated_at = NOW();
+        `, [skuId, r.producto, r.cadena, r.departamento, r.categoria, r.laboratorio, r.presentacion, r.enlace, r.imagen]);
+
+        await neonQuery(neonUrl, `
+          INSERT INTO precios_historico (
+            sku_id, fecha, precio_actual_bs, precio_anterior_bs, descuento_pct, delta_precio_bs, delta_porcentaje, disponible
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (sku_id, fecha) DO UPDATE SET
+            precio_actual_bs = EXCLUDED.precio_actual_bs,
+            precio_anterior_bs = EXCLUDED.precio_anterior_bs,
+            descuento_pct = EXCLUDED.descuento_pct,
+            delta_precio_bs = EXCLUDED.delta_precio_bs,
+            delta_porcentaje = EXCLUDED.delta_porcentaje,
+            disponible = EXCLUDED.disponible;
+        `, [
+          skuId,
+          r.fecha,
+          r.precio_bs,
+          r.precio_anterior_bs,
+          r.descuento_pct,
+          r.precio_anterior_bs ? Number((r.precio_bs - r.precio_anterior_bs).toFixed(2)) : 0,
+          r.descuento_pct ? -Math.abs(r.descuento_pct) : 0,
+          r.disponible
+        ]);
+      } catch {
+        // Ignorar si las tablas aún no están migradas
+      }
     } catch (err) {
       console.warn(`  ⚠️ Error en upsert de '${r.producto}': ${err.message}`);
     }
   }
 
-  console.log(`✅ ${inserted}/${records.length} medicamentos de Farmacias Chávez sincronizados en Neon PostgreSQL.`);
+  console.log(`\n✅ [PROCESO REALIZADO CORRECTAMENTE]: ${inserted}/${records.length} medicamentos de Farmacias Chávez sincronizados en Neon PostgreSQL.`);
 
   // Consulta resumen de totales
   try {
@@ -492,10 +679,46 @@ async function syncToNeon(neonUrl, records) {
 }
 
 // ==============================================================================
+// TELEMETRÍA Y CONTROL DE TIEMPOS DE RENDIMIENTO
+// ==============================================================================
+
+function formatDuration(ms) {
+  const totalSec = ms / 1000;
+  const mins = Math.floor(totalSec / 60);
+  const secs = (totalSec % 60).toFixed(1);
+  if (mins === 0) return `${secs} segundos`;
+  return `${mins} min ${secs} seg (${totalSec.toFixed(1)} s)`;
+}
+
+function printTelemetryBanner({ title, startTime, endTime, totalItems, extraInfo = [] }) {
+  const durationMs = endTime - startTime;
+  const durationStr = formatDuration(durationMs);
+  const durationSec = durationMs / 1000;
+  const speed = totalItems > 0 && durationSec > 0 ? (totalItems / durationSec).toFixed(2) : '0.00';
+
+  const startStr = new Date(startTime).toLocaleTimeString('es-BO', { hour12: false });
+  const endStr = new Date(endTime).toLocaleTimeString('es-BO', { hour12: false });
+
+  console.log('\n╔════════════════════════════════════════════════════════════════╗');
+  console.log(`║      ⏱️ TELEMETRÍA Y TIEMPO DE RENDIMIENTO - ${title.padEnd(16)} ║`);
+  console.log('╠════════════════════════════════════════════════════════════════╣');
+  console.log(`║  🕒 Hora de Inicio:        ${startStr.padEnd(35)} ║`);
+  console.log(`║  🏁 Hora de Finalización:  ${endStr.padEnd(35)} ║`);
+  console.log(`║  ⏳ Tiempo Total:          ${durationStr.padEnd(35)} ║`);
+  console.log(`║  📦 Total Productos:       ${(totalItems + ' productos').padEnd(35)} ║`);
+  console.log(`║  ⚡ Velocidad Promedio:    ${(speed + ' productos / segundo').padEnd(35)} ║`);
+  for (const info of extraInfo) {
+    console.log(`║  📌 ${info.padEnd(58)} ║`);
+  }
+  console.log('╚════════════════════════════════════════════════════════════════╝\n');
+}
+
+// ==============================================================================
 // EJECUCIÓN PRINCIPAL
 // ==============================================================================
 
 async function main() {
+  const startTime = Date.now();
   const options = parseArgs();
   const env = loadEnv();
   const todayStr = new Date().toISOString().split('T')[0];
@@ -544,6 +767,19 @@ async function main() {
     } else {
       await syncToNeon(env.NEON_DB, records);
     }
+
+    const endTime = Date.now();
+    printTelemetryBanner({
+      title: 'FARMACIAS CHÁVEZ',
+      startTime,
+      endTime,
+      totalItems: records.length,
+      extraInfo: [
+        `Modo: ${options.search ? 'Búsqueda ("' + options.search + '")' : options.essentials ? 'Esenciales + Promociones' : 'Básico'}`,
+        `Respaldo JSON: ${BACKUP_JSON_PATH}`,
+        `Base de Datos Neon: ${options.dryRun ? 'No (dry-run)' : 'Sincronizado con Triggers'}`
+      ]
+    });
   } catch (err) {
     console.error('❌ Error fatal en ejecución de scraper Farmacias Chávez:', err);
     process.exitCode = 1;

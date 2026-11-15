@@ -1,0 +1,24 @@
+\section{CONCLUSIONES Y RECOMENDACIONES}
+
+\subsection{Conclusiones}
+La ejecución del presente proyecto académico permitió diseñar, implementar y validar experimentalmente un \textbf{Sistema Integral de Minería Web Multidimensional} en Bolivia, demostrando la viabilidad de articular de forma simultánea la Minería de Contenido, la Minería de Estructura y la Minería de Uso sobre plataformas de alta hostilidad WAF:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Eficacia del Scraping Resiliente ante Barreras WAF:} Se comprobó empíricamente que la combinación de Playwright con perfiles persistentes de usuario y sondeo adaptativo es capaz de eludir las restricciones biométricas impuestas por Radware Bot Manager y hCAPTCHA en Hipermaxi, logrando recolectar con éxito y sin interrupciones los catálogos completos de 29 sucursales del eje central. Asimismo, la decodificación de paginadores en Shopify (Farmacorp) y Ant Design (Farmacias Chávez) garantizó una tasa de recolección superior al 99.2\%.
+    
+    \item \textbf{Eficiencia de la Arquitectura de Datos Serverless:} El diseño en modelo estrella sobre Neon PostgreSQL, combinando un catálogo maestro inmutable (\texttt{catalogo\_productos\_master}) y un histórico particionado mensualmente (\texttt{precios\_historico}), eliminó los cuellos de botella por contención de bloqueos durante inserciones concurrentes masivas. El desacoplamiento de las funciones disparadoras PL/pgSQL erradicó definitivamente los errores de ejecución, calculando en tiempo real las variaciones monetarias ($\Delta\text{Bs}$) y porcentuales ($\Delta\%$) con latencias inferiores a 25 milisegundos.
+    
+    \item \textbf{Democratización de la Información y Ahorro Ciudadano:} Las comparativas empíricas evidenciaron márgenes de dispersión de precios superiores al 30\% en medicamentos esenciales y fármacos genéricos en la ciudad de La Paz. La consolidación de esta información en canales accesibles como el bot de Telegram (\texttt{@ChatDM7200bot}) y la plataforma web Next.js 14 empodera a las familias bolivianas para tomar decisiones de compra informadas y optimizar su economía doméstica.
+    
+    \item \textbf{Innovación en Búsqueda Semántica y Estructura de Redes:} La integración de embeddings densos de 1024 dimensiones generados con microservicios NVIDIA NIM e indexados mediante HNSW en PostgreSQL superó las limitaciones de búsqueda sintética del SICOES, mientras que el modelado topológico de grafos bipartitos con PageRank y HITS proporcionó una herramienta analítica inédita para examinar las relaciones entre entidades públicas y proveedores de insumos de salud.
+\end{enumerate}
+
+\subsection{Recomendaciones y Trabajo Futuro}
+Con el propósito de proyectar la sostenibilidad y evolución del sistema, se formulan las siguientes recomendaciones técnicas:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Alertas Proactivas de Volatilidad por Mensajería:} Implementar un módulo de suscripción en el bot de Telegram que notifique automáticamente al usuario cuando un medicamento de su lista de interés registre una reducción o incremento de precio relevante ($|\Delta\%| > 15\%$).
+    \item \textbf{Integración de Modelos de Lenguaje Locales (LLM):} Incorporar instancias cuantizadas locales (como Llama 3.2 o Mistral vía Ollama) para el análisis automatizado y resumen ejecutivo de los Pliegos de Condiciones y Formularios 500 del SICOES, extrayendo especificaciones técnicas y causales de adjudicación.
+    \item \textbf{Ampliación de Cobertura Geográfica Nacional:} Extender el catálogo de sucursales y la recolección de precios hacia las capitales del sur y oriente del país (Tarija, Sucre, Oruro, Potosí, Trinidad y Cobija), incorporando cadenas de farmacias regionales y mercados de abasto departamentales.
+    \item \textbf{Monitoreo Continuo de Huella Digital de Navegador (\textit{Browser Fingerprinting}):} Implementar rotación periódica de \textit{User-Agents}, perfiles WebGL y emulación de cabeceras HTTP/2 para prevenir la detección pasiva por parte de proveedores de seguridad perimetral a largo plazo.
+\end{enumerate}

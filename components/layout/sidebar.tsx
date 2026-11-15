@@ -23,7 +23,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       items: [
         { href: '/', label: 'Dashboard Global', icon: 'dashboard' },
         { href: '/licitaciones', label: 'Licitaciones SICOES', icon: 'gavel' },
-        { href: '/canasta', label: 'Canasta Familiar (Dual)', icon: 'shopping_basket' },
+        { href: '/canasta', label: 'Catálogo Retail & Precios', icon: 'storefront' },
         { href: '/salud', label: 'Farmacias & Salud OSM', icon: 'local_pharmacy' },
       ],
     },

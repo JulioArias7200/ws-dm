@@ -59,11 +59,13 @@ export interface BotReply {
   messageId?: number;
   text: string;
   plainText: string;
+  photoUrl?: string | null;
   replyMarkup?: ReplyMarkup;
 }
 
 export interface TemplateResult {
   text: string;
+  photoUrl?: string | null;
   replyMarkup?: ReplyMarkup;
   matchedCuce?: string;
 }

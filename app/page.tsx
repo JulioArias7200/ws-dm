@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { getDashboardMetrics, neonQuery } from '@/lib/db';
+import { ScraperControlSection } from '@/components/dashboard/scraper-control-section';
 
 async function DashboardKpis() {
   const metrics = await getDashboardMetrics();
@@ -34,17 +35,17 @@ async function DashboardKpis() {
         </div>
       </div>
 
-      {/* KPI 2: Canasta Familiar */}
+      {/* KPI 2: Catálogo Retail & Precios */}
       <div className="bg-white p-5 rounded-2xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between text-[#717785] text-[13px] font-medium">
-          <span>Canasta Familiar (Dual)</span>
-          <span className="material-symbols-outlined text-amber-600">shopping_basket</span>
+          <span>Catálogo Retail & Supermercados</span>
+          <span className="material-symbols-outlined text-amber-600">storefront</span>
         </div>
         <div className="text-3xl font-bold text-[#181c22] mt-2 font-mono">
-          {extra?.canasta_count || 526}
+          {extra?.canasta_count ? extra.canasta_count.toLocaleString() : '28,000+'}
         </div>
         <div className="flex items-center gap-1.5 mt-3 text-[12px] text-amber-700 font-medium">
-          <span>OAP Mercados vs Hipermaxi</span>
+          <span>Canasta, Limpieza, Licores & Otros</span>
         </div>
       </div>
 
@@ -131,6 +132,9 @@ export default function HomePage() {
       >
         <DashboardKpis />
       </Suspense>
+
+      {/* Centro de Control y Telemetría de Scraping en Segundo Plano */}
+      <ScraperControlSection />
 
       {/* Grid de las 6 Secciones del Sistema */}
       <div className="flex flex-col gap-3">

@@ -1,0 +1,86 @@
+\section{RECURSOS Y ENLACES DEL PROYECTO}
+\label{sec:recursos_enlaces}
+
+Esta sección consolida de forma exhaustiva el directorio de enlaces, plataformas web, servicios en la nube, APIs y endpoints desarrollados e integrados a lo largo del proyecto, garantizando la reproducibilidad y auditabilidad técnica del sistema.
+
+\subsection{Interfaces y Repositorios Oficiales del Proyecto}
+En la Tabla~\ref{tab:enlaces_proyecto} se detallan los canales de acceso primario para la interacción ciudadana y la inspección del código fuente.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Canales de Acceso Oficial, Repositorios e Interfaces Ciudadanas del Proyecto}
+    \label{tab:enlaces_proyecto}
+    \begin{tabularx}{\linewidth}{p{4.2cm} p{6.0cm} L}
+        \toprule
+        \textbf{Recurso / Interfaz} & \textbf{Identificador / Enlace URL} & \textbf{Descripción y Funcionalidad} \\
+        \midrule
+        Bot Oficial de Telegram & \url{https://t.me/ChatDM7200bot} & Asistente móvil con menús inline, comparador de medicamentos y GPS Haversine. \\
+        Plataforma Web & \url{https://ws-dm.vercel.app/} & Dashboard analítico con filtros facetados en \texttt{/canasta} y mapas en \texttt{/salud}. \\
+        \bottomrule
+    \end{tabularx}
+    \tablenote{Enlaces de consulta y auditoría técnica. El bot de Telegram opera de forma continua vía webhooks serverless.}
+\end{table}
+
+\subsection{Directorio de Servicios Retail y Farmacéuticos Utilizados}
+En la Tabla~\ref{tab:enlaces_retail} se documenta el mapeo de los dominios web comerciales objeto de extracción masiva.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Directorio de Servicios Web de Comercio Minorista y Farmacias Monitoreadas}
+    \label{tab:enlaces_retail}
+    \begin{tabularx}{\linewidth}{p{3.5cm} p{5.5cm} L}
+        \toprule
+        \textbf{Comercio} & \textbf{URL Base / Dominio} & \textbf{Parámetros y Rutas Mapeadas} \\
+        \midrule
+        Hipermaxi Bolivia & \url{https://www.hipermaxi.com} & 29 sucursales eje central. Categorías: \texttt{/c/alimentos-basicos}, \texttt{/c/lacteos-y-huevos}, \texttt{/c/farmacia}, \texttt{/c/medicamentos}. \\
+        Farmacorp & \url{https://farmacorp.com} & Modo cuadrícula: \texttt{?page=N\&grid\_list=grid-view}. 70+ colecciones: \texttt{/collections/medicamentos}, \texttt{/collections/salud-sexual}, etc. \\
+        Farmacias Chávez & \url{https://www.farmaciaschavez.com.bo} & Paginación simple: \texttt{/ca/medicamentos/109}, \texttt{/ca/belleza/102}. Búsqueda: \path{/busqueda?q={termino}&page={N}}. \\
+        \bottomrule
+    \end{tabularx}
+    \tablenote{Servicios comerciales analizados. Todas las solicitudes implementan pausas de cortesía y perfiles de navegador persistentes.}
+\end{table}
+
+\subsection{Servicios Gubernamentales, Estadísticos y Geoespaciales}
+En la Tabla~\ref{tab:enlaces_gob} se detallan las plataformas públicas de información y cartografía integradas en el sistema.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Servicios Públicos, Portales Estatales y Fuentes Geoespaciales Integradas}
+    \label{tab:enlaces_gob}
+    \begin{tabularx}{\linewidth}{p{4.2cm} p{5.8cm} L}
+        \toprule
+        \textbf{Entidad / Servicio} & \textbf{URL / Endpoint de Consulta} & \textbf{Uso y Datos Extraídos} \\
+        \midrule
+        SICOES Bolivia & \url{https://www.sicoes.gob.bo} & Convocatorias, CUCE, montos referenciales y formularios 100/500 de La Paz. \\
+        Observatorio OAP & \url{http://oap.ruralytierras.gob.bo} & Precios mayoristas y minoristas de alimentos en mercados de abasto. \\
+        OpenStreetMap Overpass API & \url{https://overpass-api.de/api/interpreter} & Coordenadas geodésicas (\texttt{lat}, \texttt{lon}) y metadatos de 83 centros de salud. \\
+        Leaflet OpenStreetMap Tiles & \url{https://tile.openstreetmap.org} & Capas cartográficas dinámicas para visualización en la plataforma web. \\
+        \bottomrule
+    \end{tabularx}
+    \tablenote{Datos abiertos y fuentes gubernamentales procesadas mediante pipelines de extracción automatizada.}
+\end{table}
+
+\subsection{Servicios en la Nube, Almacenamiento, IA y APIs Internas}
+En la Tabla~\ref{tab:enlaces_cloud} se compilan los endpoints de servicios cloud, microservicios de inferencia y las rutas REST internas del backend en Next.js 14.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Servicios Cloud, Endpoints de Inteligencia Artificial y Rutas API de la Plataforma}
+    \label{tab:enlaces_cloud}
+    \begin{tabularx}{\linewidth}{p{4.2cm} p{5.5cm} L}
+        \toprule
+        \textbf{Proveedor / Servicio} & \textbf{Endpoint / Protocolo} & \textbf{Rol y Funcionalidad Técnica} \\
+        \midrule
+        Neon Serverless PostgreSQL & \url{https://ep-xxx.neon.tech/sql} & Motor SQL serverless con extensión \texttt{pgvector} y particionamiento declarativo mensual. \\
+        Neon Object Storage S3 & Protocolo AWS S3 Compatible & Bucket \texttt{assets} para persistencia inmutable de imágenes de productos. \\
+        NVIDIA NIM API & \url{https://integrate.api.nvidia.com/v1} & Microservicio de inferencia para embeddings vectoriales densos de 1024 dimensiones. \\
+        Telegram Bot API & \url{https://api.telegram.org/botTOKEN/} & Despacho de webhooks, mensajes Markdown y gestión de teclados inline. \\
+        API Interna Canasta & \texttt{/api/canasta} & Endpoint REST para consultas analíticas de productos y series de precios. \\
+        API Interna Farmacias & \texttt{/api/farmacias} & Endpoint REST para comparativas de fármacos y centros médicos. \\
+        API Interna Grafos & \texttt{/api/graph} & Métricas de centralidad topológica, PageRank y HITS de SICOES. \\
+        API Interna Streaming S3 & \texttt{/api/storage/[...key]} & Streaming de imágenes con cabecera \texttt{Cache-Control: public, max-age=604800}. \\
+        API Webhook Telegram & \texttt{/api/telegram} & Enrutador y controlador serverless para el bot \texttt{@ChatDM7200bot}. \\
+        \bottomrule
+    \end{tabularx}
+    \tablenote{Arquitectura de microservicios y endpoints REST que sustentan la plataforma analítica.}
+\end{table}

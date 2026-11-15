@@ -25,6 +25,11 @@ export function formatDateBo(iso: string | null | undefined, fallback = 'Por con
   return d.toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+export function formatPriceBs(num: number | null | undefined): string {
+  if (num == null || isNaN(num)) return 'Bs 0.00';
+  return `Bs ${num.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function parseCommand(rawText: string): { cmd: string | null; args: string } {
   const trimmed = rawText.trim();
   if (!trimmed.startsWith('/')) {

@@ -9,4 +9,5 @@ export * from './main.template';
 export * from './sicoes.template';
 export * from './canasta.template';
 export * from './salud.template';
+export * from './producto.template';
 

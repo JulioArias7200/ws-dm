@@ -1,0 +1,96 @@
+\section{MARCO TEÓRICO Y FUNDAMENTOS MATEMÁTICOS}
+
+\subsection{Taxonomía Clásica de la Minería Web}
+La Minería Web (\textit{Web Mining}) se define como la aplicación sistemática de técnicas de minería de datos, procesamiento de lenguaje natural y teoría de grafos para descubrir automáticamente patrones, estructuras y conocimiento a partir de los recursos de la World Wide Web \citep{liu2011web, han2012data}. La literatura científica formaliza su descomposición en tres vertientes complementarias:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Minería de Contenido Web (\textit{Web Content Mining}):} Extracción, estructuración y análisis del contenido informativo primario albergado en las páginas web (texto, precios, metadatos, descripciones multimedia y tablas semiestructuradas).
+    \item \textbf{Minería de Estructura Web (\textit{Web Structure Mining}):} Análisis de la topología de red subyacente y los patrones de enlace (hipervínculos, citas o relaciones entre entidades), con el fin de cuantificar la centralidad, autoridad e importancia relativa de los nodos \citep{chakrabarti2002mining}.
+    \item \textbf{Minería de Uso Web (\textit{Web Usage Mining}):} Examen del comportamiento y las trazas generadas por los usuarios durante su interacción con plataformas digitales, permitiendo modelar flujos de navegación, patrones de búsqueda y latencias de respuesta \citep{srivastava2000web}.
+\end{itemize}
+
+\subsection{Modelos de Contenido Web, DOM y Renderizado Dinámico}
+En la web contemporánea, el contenido reside en el \textbf{Modelo de Objetos del Documento} (\textit{Document Object Model} - DOM), una representación jerárquica en forma de árbol donde cada elemento HTML se mapea como un nodo programable. En aplicaciones basadas en renderizado del lado del cliente (\textit{Client-Side Rendering} - CSR), el documento HTML inicial devuelto por el servidor HTTP carece de información sustancial de productos; el contenido es inyectado de manera asíncrona mediante JavaScript tras ejecutar peticiones XHR/Fetch contra APIs internas.
+
+Para extraer datos en estos entornos se requiere instrumentar un navegador completo a través del \textit{Chrome DevTools Protocol} (CDP). Herramientas como \textbf{Playwright} \citep{playwright2024} permiten controlar instancias de Chromium que ejecutan la totalidad del ciclo de vida de JavaScript, resuelven eventos dinámicos de desplazamiento y evalúan selectores CSS3 jerárquicos de alta especificidad.
+
+\subsection{Minería de Estructura Web: Algoritmos PageRank y HITS}
+
+\subsubsection{Algoritmo PageRank}
+El algoritmo PageRank, propuesto originalmente por \citet{page1998anatomy}, modela la importancia de una página o entidad web asumiendo que un enlace entrante transfiere una fracción de la autoridad del nodo emisor. Matemáticamente, el proceso se formaliza como una cadena de Markov ergódica que describe la caminata aleatoria de un usuario sobre un grafo dirigido $G = (V, E)$, donde $V$ es el conjunto de nodos y $E$ el conjunto de aristas dirigidas.
+
+Para garantizar la convergencia a una distribución estacionaria y evitar sumideros de probabilidad (\textit{rank sinks}), se introduce un factor de amortiguamiento (\textit{damping factor}) $d \in (0, 1)$, usualmente fijado en $d = 0.85$. La ecuación estacionaria de PageRank para un nodo $u \in V$ se define como:
+
+\begin{equation}
+    PR(u) = \frac{1 - d}{|V|} + d \sum_{v \in B_u} \frac{PR(v)}{L(v)}
+    \label{eq:pagerank}
+\end{equation}
+
+\noindent donde:
+\begin{itemize}[leftmargin=*]
+    \item $|V| = N$ es la cardinalidad total del conjunto de nodos en la red.
+    \item $B_u = \{v \in V \mid (v, u) \in E\}$ representa el conjunto de nodos predecesores que enlazan directamente a $u$.
+    \item $L(v) = d_{out}(v)$ es el grado de salida (\textit{out-degree}) del nodo $v$, correspondiente a la cantidad total de enlaces salientes que emite.
+\end{itemize}
+
+En el presente proyecto, este modelo se adapta a la red de contrataciones estatales del SICOES: las entidades públicas convocantes y los rubros licitados se modelan como nodos, mientras que los procesos de contratación formalizados actúan como aristas ponderadas por el volumen presupuestario adjudicado.
+
+\subsubsection{Algoritmo HITS (Hubs and Authorities)}
+Formulado por \citet{kleinberg1999authoritative}, el algoritmo HITS descompone la relevancia de cada nodo en dos puntajes mutuamente recursivos:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Autoridad ($a(p)$):} Mide la calidad del contenido o capacidad resolutiva del nodo $p$, sustentada por la cantidad y calidad de los concentradores que lo apuntan.
+    \item \textbf{Concentrador o Hub ($h(p)$):} Mide la capacidad del nodo $p$ para direccionar hacia múltiples nodos de alta autoridad.
+\end{enumerate}
+
+Para un grafo con matriz de adyacencia $A$, las ecuaciones de actualización acopladas en la iteración $k$ están dadas por:
+
+\begin{equation}
+    a_k(p) = \sum_{q \to p} h_{k-1}(q), \qquad h_k(p) = \sum_{p \to q} a_k(q)
+    \label{eq:hits}
+\end{equation}
+
+En notación matricial, los vectores de autoridad $\vec{a}$ y concentrador $\vec{h}$ corresponden a los autovectores principales de las matrices cuadradas simétricas $A^T A$ y $A A^T$ respectivamente:
+\begin{equation}
+    A^T A \, \vec{a} = \lambda_a \vec{a}, \qquad A A^T \, \vec{h} = \lambda_h \vec{h}
+\end{equation}
+Tras cada iteración, ambos vectores son normalizados euclidianamente ($\|\vec{a}\|_2 = 1$, $\|\vec{h}\|_2 = 1$) para asegurar estabilidad numérica.
+
+\subsection{Recuperación Semántica Vectorial y Similitud Coseno}
+La búsqueda tradicional por concordancia sintáctica (\textit{keyword matching}) es incapaz de capturar relaciones sinonímicas o intenciones conceptuales abstractas en descripciones de licitaciones públicas. Para superar esta limitación, el sistema implementa \textbf{embeddings vectoriales densos} generados por modelos basados en la arquitectura Transformer provistos por NVIDIA NIM \citep{nvidia2024nim}.
+
+Un modelo de lenguaje mapea un texto arbitrario $T$ a un vector continuo de punto flotante $\vec{v} \in \mathbb{R}^{D}$, donde $D = 1024$ dimensiones. La afinidad semántica entre una consulta ciudadana $\vec{q}$ y una convocatoria registrada $\vec{d}$ se cuantifica mediante la \textbf{similitud coseno} \citep{robusto1957cosine}:
+
+\begin{equation}
+    \text{sim}(\vec{q}, \vec{d}) = \cos(\theta) = \frac{\vec{q} \cdot \vec{d}}{\|\vec{q}\|_2 \|\vec{d}\|_2} = \frac{\sum_{i=1}^{1024} q_i d_i}{\sqrt{\sum_{i=1}^{1024} q_i^2} \sqrt{\sum_{i=1}^{1024} d_i^2}}
+    \label{eq:cosine_sim}
+\end{equation}
+
+La distancia coseno complementaria $D_C(\vec{q}, \vec{d}) = 1 - \text{sim}(\vec{q}, \vec{d})$ se indexa en la base de datos PostgreSQL mediante la extensión \texttt{pgvector}, utilizando índices basados en grafos navegables de mundo pequeño (\textit{Hierarchical Navigable Small World} - HNSW), lo que permite búsquedas de vecinos más cercanos en tiempo sublineal $O(\log N)$.
+
+\subsection{Distancia Geodésica Espacial: Fórmula de Haversine}
+Para calcular con exactitud la proximidad entre las coordenadas geográficas del usuario $(\phi_1, \lambda_1)$ y los 83 centros de salud georreferenciados $(\phi_2, \lambda_2)$ en el departamento de La Paz, se emplea la formulación trigonométrica de \textbf{Haversine} \citep{robusto1957cosine}, la cual computa la distancia ortodrómica sobre la superficie de una esfera de radio medio terrestre $R = 6.371\text{ km}$:
+
+\begin{equation}
+    d = 2 R \arcsin \left( \sqrt{\sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)} \right)
+    \label{eq:haversine}
+\end{equation}
+
+\noindent donde $\Delta \phi = \phi_2 - \phi_1$ representa la diferencia de latitud en radianes, y $\Delta \lambda = \lambda_2 - \lambda_1$ la diferencia de longitud en radianes.
+
+\subsection{Formulación de Series de Tiempo de Precios y Variaciones}
+El monitoreo longitudinal del mercado minorista requiere registrar observaciones temporales discretas para cada producto o SKU (\textit{Stock Keeping Unit}). Sea $P_t(s)$ el precio unitario observado en bolivianos (Bs) para el SKU $s$ en la fecha $t$, y $P_{t-1}(s)$ el precio unitario registrado en la observación previa inmediata. Se definen formalmente dos métricas de cambio:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Variación Absoluta ($\Delta\text{Bs}$):}
+    \begin{equation}
+        \Delta\text{Bs}_t(s) = P_t(s) - P_{t-1}(s)
+        \label{eq:delta_bs}
+    \end{equation}
+    \item \textbf{Variación Porcentual Relativa ($\Delta\%$):}
+    \begin{equation}
+        \Delta\%_t(s) = \left( \frac{P_t(s) - P_{t-1}(s)}{P_{t-1}(s)} \right) \times 100
+        \label{eq:delta_pct}
+    \end{equation}
+\end{enumerate}
+
+Estas ecuaciones son computadas en tiempo real a nivel de base de datos mediante procedimientos almacenados PL/pgSQL activados por disparadores (\textit{triggers}) en cada operación de inserción.

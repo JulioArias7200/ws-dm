@@ -1,0 +1,63 @@
+\begin{thebibliography}{}
+
+\bibitem[Brin and Page, 1998]{page1998anatomy}
+Brin, S. and Page, L. (1998).
+\newblock The anatomy of a large-scale hypertextual web search engine.
+\newblock {\em Computer Networks and ISDN Systems}, 30(1--7):107--117.
+
+\bibitem[Chakrabarti, 2002]{chakrabarti2002mining}
+Chakrabarti, S. (2002).
+\newblock {\em Mining the Web: Discovering Knowledge from Hypertext Data}.
+\newblock Morgan Kaufmann, San Francisco, CA.
+
+\bibitem[Cooley et~al., 1999]{cooley1999data}
+Cooley, R., Mobasher, B., and Srivastava, J. (1999).
+\newblock Data preparation for mining world wide web browsing patterns.
+\newblock {\em Knowledge and Information Systems}, 1(1):5--32.
+
+\bibitem[Han et~al., 2012]{han2012data}
+Han, J., Kamber, M., and Pei, J. (2012).
+\newblock {\em Data Mining: Concepts and Techniques}.
+\newblock Morgan Kaufmann, Waltham, MA, 3rd edition.
+
+\bibitem[Kleinberg, 1999]{kleinberg1999authoritative}
+Kleinberg, J.~M. (1999).
+\newblock Authoritative sources in a hyperlinked environment.
+\newblock {\em Journal of the ACM}, 46(5):604--632.
+
+\bibitem[Liu, 2011]{liu2011web}
+Liu, B. (2011).
+\newblock {\em Web Data Mining: Exploring Hyperlinks, Contents, and Usage
+  Data}.
+\newblock Springer-Verlag, Berlin, Heidelberg, 2nd edition.
+
+\bibitem[{Microsoft Corporation}, 2024]{playwright2024}
+{Microsoft Corporation} (2024).
+\newblock Playwright: Fast and reliable end-to-end testing and web automation
+  for modern web apps.
+\newblock \url{https://playwright.dev/}.
+
+\bibitem[{NVIDIA Corporation}, 2024]{nvidia2024nim}
+{NVIDIA Corporation} (2024).
+\newblock Nvidia nim: Inference microservices for dense vector embeddings and
+  retrieval-augmented generation.
+\newblock \url{https://developer.nvidia.com/nim}.
+
+\bibitem[{Radware Ltd.}, 2024]{radware2024}
+{Radware Ltd.} (2024).
+\newblock Radware bot manager: Comprehensive defense against advanced web and
+  mobile bot attacks.
+\newblock \url{https://www.radware.com/products/bot-manager/}.
+
+\bibitem[Robusto, 1957]{robusto1957cosine}
+Robusto, C.~C. (1957).
+\newblock The cosine-haversine formula.
+\newblock {\em The American Mathematical Monthly}, 64(1):38--40.
+
+\bibitem[Srivastava et~al., 2000]{srivastava2000web}
+Srivastava, J., Cooley, R., Deshpande, M., and Tan, P.-N. (2000).
+\newblock Web usage mining: Discovery and applications of usage patterns from
+  web data.
+\newblock {\em ACM SIGKDD Explorations Newsletter}, 1(2):12--23.
+
+\end{thebibliography}

@@ -46,6 +46,7 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+.browser_profile_*
 data_scraped_*.json
 data_hipermaxi_*.html
 *.html.bak

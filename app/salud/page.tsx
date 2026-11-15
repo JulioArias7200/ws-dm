@@ -2,6 +2,35 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { MedicamentoItem, CentroSaludItem, ComparativaMedicamento } from '@/lib/canasta-salud';
+import { MedicamentoCard } from '@/components/salud/medicamento-card';
+
+const CADENAS = [
+  { id: 'TODAS', label: 'Todas las Cadenas' },
+  { id: 'Farmacorp', label: '🟢 Farmacorp' },
+  { id: 'Chavez', label: '🔵 Farmacias Chávez' },
+  { id: 'Hipermaxi', label: '🔴 Hipermaxi Farmacia' },
+];
+
+const RANGOS_PRECIO = [
+  { id: 'TODOS', label: 'Todos los Precios', min: undefined, max: undefined },
+  { id: '0-25', label: '< Bs 25 (Económicos)', min: 0, max: 25 },
+  { id: '25-50', label: 'Bs 25 – Bs 50', min: 25, max: 50 },
+  { id: '50-100', label: 'Bs 50 – Bs 100', min: 50, max: 100 },
+  { id: '100+', label: '> Bs 100', min: 100, max: undefined },
+];
+
+const OPCIONES_ORDEN = [
+  { id: 'precio_asc', label: '💰 Precio: Menor a Mayor' },
+  { id: 'precio_desc', label: '💎 Precio: Mayor a Menor' },
+  { id: 'descuento', label: '🏷️ Mayor Descuento %' },
+  { id: 'nombre', label: '🔤 Nombre (A - Z)' },
+];
+
+function getMedImageUrl(rawImage?: string | null): string {
+  if (!rawImage) return '/images/salud/medication.svg';
+  if (rawImage.startsWith('http') || rawImage.startsWith('/api/')) return rawImage;
+  return `/api/storage/${rawImage.replace(/^\/+/, '')}`;
+}
 
 export default function SaludPage() {
   const [activeTab, setActiveTab] = useState<'farmacias' | 'centros'>('farmacias');
@@ -9,8 +38,16 @@ export default function SaludPage() {
   // Estado para Farmacias
   const [pharmaQuery, setPharmaQuery] = useState('');
   const [cadenaFilter, setCadenaFilter] = useState('TODAS');
+  const [rangoPrecio, setRangoPrecio] = useState('TODOS');
+  const [customMin, setCustomMin] = useState('');
+  const [customMax, setCustomMax] = useState('');
+  const [appliedCustomMin, setAppliedCustomMin] = useState<number | undefined>(undefined);
+  const [appliedCustomMax, setAppliedCustomMax] = useState<number | undefined>(undefined);
+  const [sortBy, setSortBy] = useState<'precio_asc' | 'precio_desc' | 'descuento' | 'nombre'>('precio_asc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'all'>(12);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [medicamentos, setMedicamentos] = useState<MedicamentoItem[]>([]);
   const [comparativa, setComparativa] = useState<ComparativaMedicamento | null>(null);
   const [loadingPharma, setLoadingPharma] = useState(false);
@@ -25,16 +62,34 @@ export default function SaludPage() {
     setLoadingPharma(true);
     try {
       const params = new URLSearchParams();
-      if (pharmaQuery) params.set('q', pharmaQuery);
+      if (pharmaQuery.trim()) params.set('q', pharmaQuery.trim());
       if (cadenaFilter && cadenaFilter !== 'TODAS') params.set('cadena', cadenaFilter);
+
+      // Determinar límites de precio
+      let minVal = appliedCustomMin;
+      let maxVal = appliedCustomMax;
+
+      if (rangoPrecio !== 'CUSTOM') {
+        const found = RANGOS_PRECIO.find((r) => r.id === rangoPrecio);
+        if (found) {
+          minVal = found.min;
+          maxVal = found.max;
+        }
+      }
+
+      if (minVal != null) params.set('minPrice', String(minVal));
+      if (maxVal != null) params.set('maxPrice', String(maxVal));
+      if (sortBy) params.set('sortBy', sortBy);
+
       params.set('page', String(page));
-      params.set('limit', '12');
+      params.set('limit', pageSize === 'all' ? '500' : String(pageSize));
 
       const res = await fetch(`/api/farmacias?${params.toString()}`);
       const data = await res.json();
       if (data.paginado) {
         setMedicamentos(data.paginado.items || []);
         setTotalPages(data.paginado.totalPages || 1);
+        setTotalItems(data.paginado.total || 0);
       }
       if (data.comparativa) {
         setComparativa(data.comparativa);
@@ -46,7 +101,7 @@ export default function SaludPage() {
     } finally {
       setLoadingPharma(false);
     }
-  }, [pharmaQuery, cadenaFilter, page]);
+  }, [pharmaQuery, cadenaFilter, rangoPrecio, appliedCustomMin, appliedCustomMax, sortBy, page, pageSize]);
 
   // Carga de Centros de Salud
   const fetchCentros = useCallback(async () => {
@@ -76,6 +131,36 @@ export default function SaludPage() {
       fetchCentros();
     }
   }, [activeTab, fetchMedicamentos, fetchCentros]);
+
+  // Manejar aplicación de filtro personalizado de precios
+  const handleApplyCustomPrice = (e: React.FormEvent) => {
+    e.preventDefault();
+    const minNum = customMin ? Number(customMin) : undefined;
+    const maxNum = customMax ? Number(customMax) : undefined;
+    setAppliedCustomMin(minNum);
+    setAppliedCustomMax(maxNum);
+    setRangoPrecio('CUSTOM');
+    setPage(1);
+  };
+
+  // Restablecer todos los filtros
+  const handleResetFilters = () => {
+    setPharmaQuery('');
+    setCadenaFilter('TODAS');
+    setRangoPrecio('TODOS');
+    setCustomMin('');
+    setCustomMax('');
+    setAppliedCustomMin(undefined);
+    setAppliedCustomMax(undefined);
+    setSortBy('precio_asc');
+    setPage(1);
+  };
+
+  const hasActiveFilters =
+    pharmaQuery.trim() !== '' ||
+    cadenaFilter !== 'TODAS' ||
+    rangoPrecio !== 'TODOS' ||
+    sortBy !== 'precio_asc';
 
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
@@ -124,9 +209,9 @@ export default function SaludPage() {
 
       {/* PESTAÑA 1: FARMACIAS */}
       {activeTab === 'farmacias' && (
-        <div className="flex flex-col gap-6">
-          {/* Buscador de Fármacos */}
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-5">
+          {/* Fila 1: Buscador de Fármacos + Selector de Farmacia */}
+          <div className="flex flex-col lg:flex-row gap-3">
             <div className="relative flex-1">
               <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">
                 search
@@ -138,29 +223,136 @@ export default function SaludPage() {
                   setPharmaQuery(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Buscar medicamento o principio activo (ej. Paracetamol, Ibuprofeno, Amoxicilina, Aspirina)..."
+                placeholder="Buscar por fármaco o principio activo (ej. Paracetamol, Ibuprofeno, Amoxicilina, Aspirina)..."
                 className="w-full pl-11 pr-4 py-3 bg-white border border-[#e0e2eb] rounded-xl text-[14px] text-[#181c22] placeholder-gray-400 focus:outline-none focus:border-[#005cb8] shadow-sm transition-all"
               />
             </div>
 
-            {/* Filtro por Cadena */}
-            <div className="flex items-center bg-white p-1 rounded-xl border border-[#e0e2eb] shadow-xs">
-              {(['TODAS', 'Farmacorp', 'Chávez'] as const).map((cad) => (
+            {/* Filtro por Cadena de Farmacia */}
+            <div className="flex items-center bg-white p-1 rounded-xl border border-[#e0e2eb] shadow-xs overflow-x-auto shrink-0">
+              {CADENAS.map((cad) => (
                 <button
-                  key={cad}
+                  key={cad.id}
                   onClick={() => {
-                    setCadenaFilter(cad);
+                    setCadenaFilter(cad.id);
                     setPage(1);
                   }}
-                  className={`px-3 py-2 rounded-lg text-[12px] font-medium transition-colors ${
-                    cadenaFilter === cad
-                      ? 'bg-[#005cb8] text-white font-bold'
+                  className={`px-3.5 py-2 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap ${
+                    cadenaFilter === cad.id
+                      ? 'bg-[#005cb8] text-white font-bold shadow-xs'
                       : 'text-[#414753] hover:bg-gray-50'
                   }`}
                 >
-                  {cad === 'TODAS' ? 'Todas' : cad === 'Farmacorp' ? '🟢 Farmacorp' : '🔵 Chávez'}
+                  {cad.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Fila 2: Panel Avanzado de Precios y Ordenamiento */}
+          <div className="bg-white p-4 rounded-2xl border border-[#e0e2eb] shadow-xs flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-[#f1f3fc]">
+              {/* Píldoras de Rango de Precios */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+                <span className="text-[11px] font-mono text-[#717785] uppercase shrink-0 font-bold mr-1">
+                  Rango Precios:
+                </span>
+                {RANGOS_PRECIO.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => {
+                      setRangoPrecio(r.id);
+                      setAppliedCustomMin(undefined);
+                      setAppliedCustomMax(undefined);
+                      setCustomMin('');
+                      setCustomMax('');
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap ${
+                      rangoPrecio === r.id
+                        ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                        : 'bg-[#f1f3fc] text-[#414753] hover:bg-[#e4e8f7]'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selector de Ordenamiento */}
+              <div className="flex items-center gap-2 self-start lg:self-auto shrink-0">
+                <span className="text-[11px] font-mono text-[#717785] uppercase font-bold shrink-0">
+                  Ordenar por:
+                </span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value as 'precio_asc' | 'precio_desc' | 'descuento' | 'nombre');
+                    setPage(1);
+                  }}
+                  className="px-3 py-1.5 bg-[#f1f3fc] border border-[#e0e2eb] rounded-lg text-[12px] font-medium text-[#181c22] focus:outline-none focus:border-[#005cb8]"
+                >
+                  {OPCIONES_ORDEN.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Sub-fila: Inputs personalizados de precio y botón limpiar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[12px]">
+              <form onSubmit={handleApplyCustomPrice} className="flex items-center gap-2 flex-wrap">
+                <span className="text-[#717785] font-medium">Personalizado:</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[#717785] font-mono text-[11px]">Bs</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={customMin}
+                    onChange={(e) => setCustomMin(e.target.value)}
+                    placeholder="Mínimo"
+                    className="w-20 px-2 py-1 bg-[#f8fafd] border border-[#e0e2eb] rounded-lg text-[12px] text-[#181c22] focus:outline-none focus:border-[#005cb8]"
+                  />
+                </div>
+                <span className="text-[#717785]">-</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[#717785] font-mono text-[11px]">Bs</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={customMax}
+                    onChange={(e) => setCustomMax(e.target.value)}
+                    placeholder="Máximo"
+                    className="w-20 px-2 py-1 bg-[#f8fafd] border border-[#e0e2eb] rounded-lg text-[12px] text-[#181c22] focus:outline-none focus:border-[#005cb8]"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="px-3 py-1 bg-[#005cb8] text-white rounded-lg text-[11px] font-bold hover:bg-[#004b98] transition-colors"
+                >
+                  Filtrar
+                </button>
+              </form>
+
+              <div className="flex items-center gap-3">
+                <span className="text-[#717785] font-mono">
+                  Mostrando <strong>{medicamentos.length}</strong> de <strong>{totalItems}</strong> medicamentos
+                </span>
+
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleResetFilters}
+                    className="text-[#005cb8] hover:text-[#004b98] font-bold text-[11px] flex items-center gap-1 underline underline-offset-2"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">refresh</span>
+                    <span>Limpiar Filtros</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -195,109 +387,91 @@ export default function SaludPage() {
           {loadingPharma ? (
             <div className="p-12 text-center text-[#717785]">
               <span className="material-symbols-outlined text-4xl animate-spin text-[#005cb8]">sync</span>
-              <p className="mt-2 text-[14px]">Consultando catálogos de Farmacorp y Chávez en Neon DB...</p>
+              <p className="mt-2 text-[14px]">Consultando catálogos de Farmacorp, Chávez e Hipermaxi en Neon DB...</p>
             </div>
           ) : medicamentos.length === 0 ? (
-            <div className="bg-white p-12 text-center rounded-xl border border-[#e0e2eb]">
-              <span className="material-symbols-outlined text-5xl text-gray-300">medication</span>
-              <p className="text-[16px] font-bold text-[#181c22] mt-3">No se encontraron medicamentos</p>
-              <p className="text-[13px] text-[#717785] mt-1">Prueba con otro principio activo o elimina el filtro.</p>
+            <div className="bg-white p-12 text-center rounded-2xl border border-[#e0e2eb] flex flex-col items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl">medication</span>
+              </div>
+              <h3 className="text-[16px] font-bold text-[#181c22]">No se encontraron medicamentos</h3>
+              <p className="text-[13px] text-[#717785] max-w-md">
+                No hay coincidencias con los filtros seleccionados (Cadena: <strong>{cadenaFilter}</strong>, Rango:{' '}
+                <strong>{rangoPrecio}</strong>).
+              </p>
+              <button
+                onClick={handleResetFilters}
+                className="mt-2 bg-[#005cb8] text-white px-4 py-2 rounded-xl text-[13px] font-bold hover:bg-[#004b98] transition-colors"
+              >
+                Restablecer Filtros
+              </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {medicamentos.map((med) => {
-                const isFarmacorp = med.cadena.toLowerCase().includes('farmacorp');
-                return (
-                  <div
-                    key={med.id}
-                    className="bg-white p-5 rounded-xl border border-[#e0e2eb] shadow-sm flex flex-col justify-between hover:border-[#005cb8] transition-all"
-                  >
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-wider uppercase ${
-                            isFarmacorp
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-blue-50 text-blue-700 border border-blue-200'
-                          }`}
-                        >
-                          {isFarmacorp ? '🟢 Farmacorp' : '🔵 Farmacias Chávez'}
-                        </span>
-                        <span className="text-[10px] font-mono text-[#717785]">{med.departamento}</span>
-                      </div>
-
-                      <h3 className="text-[15px] font-bold text-[#181c22] line-clamp-2 mt-1">
-                        {med.producto}
-                      </h3>
-
-                      {med.presentacion && (
-                        <div className="text-[11px] font-mono text-[#717785]">
-                          Presentación: {med.presentacion}
-                        </div>
-                      )}
-
-                      {med.laboratorio && (
-                        <div className="text-[11px] text-[#414753]">
-                          Laboratorio: <span className="font-medium">{med.laboratorio}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-[#f1f3fc] flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] font-mono text-[#717785] uppercase">Precio Oficial</div>
-                        <div className="text-[18px] font-mono font-bold text-[#181c22]">
-                          Bs {med.precio_bs.toFixed(2)}
-                        </div>
-                        {med.precio_anterior_bs && (
-                          <div className="text-[11px] font-mono text-gray-400 line-through">
-                            Bs {med.precio_anterior_bs.toFixed(2)}
-                          </div>
-                        )}
-                      </div>
-
-                      {med.enlace ? (
-                        <a
-                          href={med.enlace}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-[#005cb8] text-white px-3.5 py-2 rounded-xl text-[12px] font-bold hover:bg-[#004b98] transition-colors flex items-center gap-1 shadow-xs"
-                        >
-                          <span>Comprar</span>
-                          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-gray-400 font-mono">En tienda física</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              {medicamentos.map((med) => (
+                <MedicamentoCard key={med.id} med={med} />
+              ))}
             </div>
           )}
 
-          {/* Paginador */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 pt-4 border-t border-[#e0e2eb]">
-              <button
-                onClick={() => setPage((p) => Math.max(p - 1, 1))}
-                disabled={page <= 1}
-                className="px-4 py-2 rounded-xl border border-[#e0e2eb] text-[13px] font-medium text-[#414753] hover:bg-[#f1f3fc] disabled:opacity-40 transition-colors"
-              >
-                Anterior
-              </button>
-              <span className="text-[13px] font-mono text-[#717785]">
-                Página {page} de {totalPages}
+          {/* Barra de Paginación Completa de Medicamentos */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-white rounded-2xl border border-[#e0e2eb] shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-[#414753] font-mono">
+                Total:{' '}
+                <strong className="text-[#005cb8]">{totalItems}</strong> medicamentos en catálogo
               </span>
-              <button
-                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-                disabled={page >= totalPages}
-                className="px-4 py-2 rounded-xl border border-[#e0e2eb] text-[13px] font-medium text-[#414753] hover:bg-[#f1f3fc] disabled:opacity-40 transition-colors"
-              >
-                Siguiente
-              </button>
+
+              <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#717785]">
+                <span>Por pág:</span>
+                {[12, 24, 48, 'all'].map((sz) => (
+                  <button
+                    key={sz}
+                    onClick={() => {
+                      setPageSize(sz as number | 'all');
+                      setPage(1);
+                    }}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                      pageSize === sz
+                        ? 'bg-[#005cb8] text-white'
+                        : 'bg-[#f1f3fc] text-[#414753] hover:bg-[#e4e8f7]'
+                    }`}
+                  >
+                    {sz === 'all' ? 'Todos' : sz}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
+
+            {pageSize !== 'all' && totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-[#e0e2eb] bg-white text-[#181c22] text-[12px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center gap-1 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                  <span>Anterior</span>
+                </button>
+
+                <div className="flex items-center gap-1 px-2 font-mono text-[12px] text-[#414753]">
+                  Página <strong className="text-[#005cb8]">{page}</strong> de{' '}
+                  <strong className="text-[#181c22]">{totalPages}</strong>
+                </div>
+
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-lg border border-[#e0e2eb] bg-white text-[#181c22] text-[12px] font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center gap-1 transition-colors"
+                >
+                  <span>Siguiente</span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -371,4 +545,3 @@ export default function SaludPage() {
     </div>
   );
 }
-

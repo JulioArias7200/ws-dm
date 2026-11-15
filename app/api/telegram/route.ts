@@ -4,6 +4,7 @@ import {
   processTelegramCallback,
   processTelegramMessage,
   sendTelegramResponse,
+  sendTelegramPhoto,
   TELEGRAM_COMMANDS_MENU,
   TelegramUpdate,
 } from '@/lib/telegram-service';
@@ -22,17 +23,22 @@ export async function POST(req: NextRequest) {
       const reply = await processTelegramCallback(body);
       let delivered = false;
       if (reply.chatId && reply.text && !isSimulated && reply.chatId !== 777999) {
-        delivered = await sendTelegramResponse(
-          reply.chatId,
-          reply.text,
-          reply.replyMarkup,
-          reply.messageId
-        );
+        if (reply.photoUrl) {
+          delivered = await sendTelegramPhoto(reply.chatId, reply.photoUrl, reply.text, reply.replyMarkup);
+        } else {
+          delivered = await sendTelegramResponse(
+            reply.chatId,
+            reply.text,
+            reply.replyMarkup,
+            reply.messageId
+          );
+        }
       }
       return NextResponse.json({
         ok: true,
         delivered,
         reply: reply.plainText,
+        photoUrl: reply.photoUrl || null,
         buttons: reply.replyMarkup?.inline_keyboard?.flat().map((b) => b.text) ?? [],
       });
     }
@@ -46,13 +52,18 @@ export async function POST(req: NextRequest) {
     let delivered = false;
 
     if (reply.chatId && reply.text && !isSimulated && reply.chatId !== 777999) {
-      delivered = await sendTelegramResponse(reply.chatId, reply.text, reply.replyMarkup);
+      if (reply.photoUrl) {
+        delivered = await sendTelegramPhoto(reply.chatId, reply.photoUrl, reply.text, reply.replyMarkup);
+      } else {
+        delivered = await sendTelegramResponse(reply.chatId, reply.text, reply.replyMarkup);
+      }
     }
 
     return NextResponse.json({
       ok: true,
       delivered,
       reply: reply.plainText,
+      photoUrl: reply.photoUrl || null,
       buttons: reply.replyMarkup?.inline_keyboard?.flat().map((b) => b.text) ?? [],
     });
   } catch (err: unknown) {

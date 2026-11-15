@@ -4,7 +4,7 @@ import { computeGraphMining } from '@/lib/graph-mining';
 
 export async function GET() {
   try {
-    const edges = await getGraphEdges();
+    const edges = await getGraphEdges().catch(() => []);
     const result = computeGraphMining(edges, 0.85);
 
     return NextResponse.json({

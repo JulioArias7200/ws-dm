@@ -17,7 +17,17 @@
   --color-outline: #717785;
   --color-outline-variant: #c1c6d5;
 
-  --font-sans: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --color-brand-sand: #E6DFD5;
+  --color-brand-sand-light: #F3EFEA;
+  --color-brand-sand-muted: #C2B8A8;
+  --color-brand-charcoal: #1A1918;
+  --color-brand-stone: #7C7975;
+  --color-brand-soft-bg: #F8F7F4;
+
+  --shadow-luxury: 0 20px 45px -15px rgba(28, 25, 23, 0.07), 0 0 1px 1px rgba(28, 25, 23, 0.04);
+  --shadow-subtle-hover: 0 25px 50px -12px rgba(28, 25, 23, 0.12);
+
+  --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
@@ -48,3 +58,9 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #717785;
 }
+
+/* Micro-styling para transiciones suaves de catálogo Aura */
+.transition-smooth {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+

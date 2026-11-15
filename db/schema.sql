@@ -144,3 +144,211 @@ CREATE INDEX IF NOT EXISTS med_cadena_depto_idx ON medicamentos_precios (cadena,
 CREATE INDEX IF NOT EXISTS med_producto_idx ON medicamentos_precios (producto);
 CREATE INDEX IF NOT EXISTS med_precio_idx ON medicamentos_precios (precio_bs);
 
+-- 8. Catálogo Maestro Unificado de Productos (Hipermaxi, Farmacias Chávez, Farmacorp)
+CREATE TABLE IF NOT EXISTS catalogo_productos_master (
+    sku_id VARCHAR(180) PRIMARY KEY,     -- Identificador determinista (ej. 'farmacorp-mentisan', 'chavez-105775', 'hipermaxi-leche-pil')
+    producto VARCHAR(255) NOT NULL,
+    cadena VARCHAR(100) NOT NULL,        -- 'Hipermaxi Supermercado', 'Hipermaxi Farmacia', 'Farmacias Chavez', 'Farmacorp'
+    departamento VARCHAR(50) NOT NULL,   -- 'La Paz', 'Santa Cruz', 'Cochabamba', 'Nacional'
+    sucursal VARCHAR(150),
+    categoria VARCHAR(120),
+    laboratorio VARCHAR(120),
+    presentacion VARCHAR(120),
+    unidad_medida VARCHAR(50),
+    enlace_canonica TEXT,
+    imagen TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS catalogo_master_cadena_idx ON catalogo_productos_master (cadena, departamento);
+CREATE INDEX IF NOT EXISTS catalogo_master_producto_idx ON catalogo_productos_master (producto);
+
+-- 9. Histórico Diario Particionado por Rango de Fechas (Time-Series Datos Calientes: 365 Días)
+CREATE TABLE IF NOT EXISTS precios_historico (
+    id BIGSERIAL,
+    sku_id VARCHAR(180) NOT NULL,
+    fecha DATE NOT NULL,
+    precio_actual_bs NUMERIC(10, 2) NOT NULL,
+    precio_anterior_bs NUMERIC(10, 2),
+    descuento_pct NUMERIC(5, 2),
+    delta_precio_bs NUMERIC(10, 2) DEFAULT 0.00,
+    delta_porcentaje NUMERIC(6, 2) DEFAULT 0.00,
+    disponible BOOLEAN DEFAULT TRUE,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id, fecha),
+    CONSTRAINT precios_historico_sku_fecha_uniq UNIQUE (sku_id, fecha)
+) PARTITION BY RANGE (fecha);
+
+-- Particiones mensuales
+CREATE TABLE IF NOT EXISTS precios_historico_2026_11 PARTITION OF precios_historico
+    FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
+
+CREATE TABLE IF NOT EXISTS precios_historico_2026_12 PARTITION OF precios_historico
+    FOR VALUES FROM ('2026-12-01') TO ('2027-01-01');
+
+CREATE TABLE IF NOT EXISTS precios_historico_2027_q1 PARTITION OF precios_historico
+    FOR VALUES FROM ('2027-01-01') TO ('2027-04-01');
+
+CREATE TABLE IF NOT EXISTS precios_historico_default PARTITION OF precios_historico DEFAULT;
+
+CREATE INDEX IF NOT EXISTS precios_hist_sku_idx ON precios_historico (sku_id, fecha DESC);
+
+-- 10. Histórico Consolidado Semanal (Datos Fríos: > 1 Año, Downsampling Temporal)
+CREATE TABLE IF NOT EXISTS precios_historico_semanal (
+    sku_id VARCHAR(180) NOT NULL,
+    anio INT NOT NULL,
+    semana INT NOT NULL,
+    fecha_inicio_semana DATE NOT NULL,
+    precio_min_bs NUMERIC(10, 2) NOT NULL,
+    precio_max_bs NUMERIC(10, 2) NOT NULL,
+    precio_promedio_bs NUMERIC(10, 2) NOT NULL,
+    precio_cierre_bs NUMERIC(10, 2) NOT NULL,
+    observaciones_dias INT DEFAULT 1,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (sku_id, anio, semana)
+);
+
+CREATE INDEX IF NOT EXISTS precios_hist_sem_sku_idx ON precios_historico_semanal (sku_id, anio DESC, semana DESC);
+
+-- 11. Funciones Trigger Reactivas Especializadas (Auto-Sincronización a Catálogo Maestro e Histórico)
+
+-- Trigger para Canasta Familiar (Hipermaxi Supermercado / OAP)
+CREATE OR REPLACE FUNCTION fn_replicate_canasta_to_master()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_sku VARCHAR(180);
+    v_cadena VARCHAR(100);
+    v_last_price NUMERIC(10, 2);
+    v_delta_bs NUMERIC(10, 2) := 0.00;
+    v_delta_pct NUMERIC(6, 2) := 0.00;
+BEGIN
+    v_cadena := COALESCE(NEW.fuente, 'Hipermaxi');
+    v_sku := SUBSTRING('hipermaxi-' || LOWER(REGEXP_REPLACE(NEW.producto, '[^a-zA-Z0-9]+', '-', 'g')), 1, 180);
+
+    -- 1. Upsert en catálogo maestro
+    INSERT INTO catalogo_productos_master (
+        sku_id, producto, cadena, departamento, categoria, laboratorio,
+        presentacion, unidad_medida, enlace_canonica, imagen, updated_at
+    ) VALUES (
+        v_sku, NEW.producto, v_cadena, NEW.departamento, NEW.categoria, 'Supermercado',
+        NEW.unidad_medida, NEW.unidad_medida, NEW.enlace, NEW.imagen, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (sku_id) DO UPDATE SET
+        categoria = COALESCE(EXCLUDED.categoria, catalogo_productos_master.categoria),
+        unidad_medida = COALESCE(EXCLUDED.unidad_medida, catalogo_productos_master.unidad_medida),
+        enlace_canonica = COALESCE(EXCLUDED.enlace_canonica, catalogo_productos_master.enlace_canonica),
+        imagen = CASE
+            WHEN catalogo_productos_master.imagen LIKE 'canasta/%' THEN catalogo_productos_master.imagen
+            ELSE COALESCE(EXCLUDED.imagen, catalogo_productos_master.imagen)
+        END,
+        updated_at = CURRENT_TIMESTAMP;
+
+    -- 2. Calcular delta contra precio previo
+    SELECT precio_actual_bs INTO v_last_price
+    FROM precios_historico
+    WHERE sku_id = v_sku AND fecha < NEW.fecha
+    ORDER BY fecha DESC LIMIT 1;
+
+    IF v_last_price IS NOT NULL AND v_last_price > 0 THEN
+        v_delta_bs := NEW.precio_bs - v_last_price;
+        v_delta_pct := ROUND(((NEW.precio_bs - v_last_price) / v_last_price) * 100, 2);
+    END IF;
+
+    -- 3. Upsert en histórico particionado
+    INSERT INTO precios_historico (
+        sku_id, fecha, precio_actual_bs, precio_anterior_bs, descuento_pct,
+        delta_precio_bs, delta_porcentaje, disponible
+    ) VALUES (
+        v_sku, NEW.fecha, NEW.precio_bs, NULL, NULL,
+        v_delta_bs, v_delta_pct, TRUE
+    )
+    ON CONFLICT (sku_id, fecha) DO UPDATE SET
+        precio_actual_bs = EXCLUDED.precio_actual_bs,
+        delta_precio_bs = EXCLUDED.delta_precio_bs,
+        delta_porcentaje = EXCLUDED.delta_porcentaje,
+        disponible = TRUE;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger para Medicamentos y Farmacias (Farmacorp, Chávez, Hipermaxi Farmacia)
+CREATE OR REPLACE FUNCTION fn_replicate_medicamento_to_master()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_sku VARCHAR(180);
+    v_last_price NUMERIC(10, 2);
+    v_delta_bs NUMERIC(10, 2) := 0.00;
+    v_delta_pct NUMERIC(6, 2) := 0.00;
+BEGIN
+    v_sku := SUBSTRING(LOWER(REGEXP_REPLACE(NEW.cadena, '[^a-zA-Z0-9]+', '-', 'g')) || '-' ||
+             LOWER(REGEXP_REPLACE(NEW.producto, '[^a-zA-Z0-9]+', '-', 'g')), 1, 180);
+
+    -- 1. Upsert en catálogo maestro
+    INSERT INTO catalogo_productos_master (
+        sku_id, producto, cadena, departamento, categoria, laboratorio,
+        presentacion, unidad_medida, enlace_canonica, imagen, updated_at
+    ) VALUES (
+        v_sku, NEW.producto, NEW.cadena, NEW.departamento, NEW.categoria, NEW.laboratorio,
+        NEW.presentacion, 'Unidad', NEW.enlace, NEW.imagen, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (sku_id) DO UPDATE SET
+        categoria = COALESCE(EXCLUDED.categoria, catalogo_productos_master.categoria),
+        laboratorio = COALESCE(EXCLUDED.laboratorio, catalogo_productos_master.laboratorio),
+        presentacion = COALESCE(EXCLUDED.presentacion, catalogo_productos_master.presentacion),
+        enlace_canonica = COALESCE(EXCLUDED.enlace_canonica, catalogo_productos_master.enlace_canonica),
+        imagen = CASE
+            WHEN catalogo_productos_master.imagen LIKE 'farmacias/%' THEN catalogo_productos_master.imagen
+            ELSE COALESCE(EXCLUDED.imagen, catalogo_productos_master.imagen)
+        END,
+        updated_at = CURRENT_TIMESTAMP;
+
+    -- 2. Calcular delta contra precio previo
+    SELECT precio_actual_bs INTO v_last_price
+    FROM precios_historico
+    WHERE sku_id = v_sku AND fecha < NEW.fecha
+    ORDER BY fecha DESC LIMIT 1;
+
+    IF v_last_price IS NOT NULL AND v_last_price > 0 THEN
+        v_delta_bs := NEW.precio_bs - v_last_price;
+        v_delta_pct := ROUND(((NEW.precio_bs - v_last_price) / v_last_price) * 100, 2);
+    ELSIF NEW.precio_anterior_bs IS NOT NULL AND NEW.precio_anterior_bs > 0 THEN
+        v_delta_bs := NEW.precio_bs - NEW.precio_anterior_bs;
+        v_delta_pct := ROUND(((NEW.precio_bs - NEW.precio_anterior_bs) / NEW.precio_anterior_bs) * 100, 2);
+    END IF;
+
+    -- 3. Upsert en histórico particionado
+    INSERT INTO precios_historico (
+        sku_id, fecha, precio_actual_bs, precio_anterior_bs, descuento_pct,
+        delta_precio_bs, delta_porcentaje, disponible
+    ) VALUES (
+        v_sku, NEW.fecha, NEW.precio_bs, NEW.precio_anterior_bs, NEW.descuento_pct,
+        v_delta_bs, v_delta_pct, NEW.disponible
+    )
+    ON CONFLICT (sku_id, fecha) DO UPDATE SET
+        precio_actual_bs = EXCLUDED.precio_actual_bs,
+        precio_anterior_bs = EXCLUDED.precio_anterior_bs,
+        descuento_pct = EXCLUDED.descuento_pct,
+        delta_precio_bs = EXCLUDED.delta_precio_bs,
+        delta_porcentaje = EXCLUDED.delta_porcentaje,
+        disponible = EXCLUDED.disponible;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers reactivos en ambas tablas operacionales
+DROP TRIGGER IF EXISTS trg_medicamentos_replicate ON medicamentos_precios;
+CREATE TRIGGER trg_medicamentos_replicate
+AFTER INSERT OR UPDATE ON medicamentos_precios
+FOR EACH ROW EXECUTE FUNCTION fn_replicate_medicamento_to_master();
+
+DROP TRIGGER IF EXISTS trg_canasta_replicate ON canasta_precios;
+CREATE TRIGGER trg_canasta_replicate
+AFTER INSERT OR UPDATE ON canasta_precios
+FOR EACH ROW EXECUTE FUNCTION fn_replicate_canasta_to_master();
+
+
+
+

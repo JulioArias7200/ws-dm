@@ -1,4 +1,4 @@
-import { escHtml } from './formatters';
+import { escHtml, formatPriceBs } from './formatters';
 import { BACK_TO_HOME_ROW, BACK_TO_CANASTA_ROW } from './buttons';
 import { TemplateResult, ReplyMarkup, InlineKeyboardButton } from './types';
 import type { CanastaItem } from '../canasta-salud';
@@ -13,36 +13,40 @@ export interface CanastaComparisonItem {
 }
 
 /**
- * Plantillas visuales para el Módulo Canasta Familiar (OAP Mercados Populares e Hipermaxi Supermercados)
+ * Plantillas visuales para el Módulo Canasta Familiar y Catálogo Multi-Tienda (OAP e Hipermaxi)
  */
 
 export function renderCanastaMenu(city = 'La Paz', fuente = 'Todas'): TemplateResult {
   const text =
-    `🛒 <b>Módulo Canasta Familiar — Eje Central Bolivia 🇧🇴</b>\n\n` +
-    `<blockquote><b>Fuentes integradas en paralelo:</b>\n` +
+    `🛒 <b>Catálogo Comercial & Canasta Familiar — Eje Central Bolivia 🇧🇴</b>\n\n` +
+    `<blockquote><b>Fuentes y Comercios Monitoreados:</b>\n` +
     `1. 🏪 <b>Observatorio Agroambiental (OAP):</b> Mercados populares.\n` +
-    `2. 🛒 <b>Hipermaxi S.A.:</b> Supermercados en Calacoto, Cañoto y Blanco Galindo.\n\n` +
-    `📍 <b>Ciudad activa:</b> <b>${escHtml(city)}</b> | 🏬 <b>Fuente:</b> <b>${escHtml(fuente)}</b></blockquote>\n\n` +
+    `2. 🛒 <b>Hipermaxi S.A.:</b> Todas las sucursales (La Paz, Cochabamba, Santa Cruz).\n\n` +
+    `📍 <b>Ciudad:</b> <b>${escHtml(city)}</b> | 🏬 <b>Fuente:</b> <b>${escHtml(fuente)}</b></blockquote>\n\n` +
     `⬇️ <b>Selecciona una categoría o herramienta:</b>`;
 
   const replyMarkup: ReplyMarkup = {
     inline_keyboard: [
       [{ text: '📈 Comparar Eje Troncal (LPZ vs CBB vs SCZ)', callback_data: 'canasta_comparar' }],
       [
-        { text: '🥔 Verduras y Tubérculos', callback_data: 'canasta_cat_verduras' },
-        { text: '🍗 Carnes y Pollo', callback_data: 'canasta_cat_carnes' },
+        { text: '🧺 Canasta & Alimentos', callback_data: 'canasta_macro:canasta' },
+        { text: '🧼 Limpieza & Hogar', callback_data: 'canasta_macro:limpieza' },
       ],
       [
-        { text: '🌾 Abarrotes y Aceite', callback_data: 'canasta_cat_abarrotes' },
-        { text: '🥛 Lácteos y Derivados', callback_data: 'canasta_cat_lacteos' },
+        { text: '🍷 Licores & Bebidas', callback_data: 'canasta_macro:licores' },
+        { text: '🧴 Cuidado Personal', callback_data: 'canasta_macro:personal' },
+      ],
+      [
+        { text: '🥔 Verduras', callback_data: 'canasta_cat_verduras' },
+        { text: '🍗 Carnes', callback_data: 'canasta_cat_carnes' },
       ],
       [
         { text: `🏬 Fuente [${fuente} ▾]`, callback_data: 'canasta_menu_fuente' },
         { text: `🌆 Ciudad [${city} ▾]`, callback_data: 'canasta_menu_city' },
       ],
       [
+        { text: '🔎 Buscar Producto (/canasta)', callback_data: 'canasta_buscar_hint' },
         { text: '🔄 Actualizar OAP', callback_data: 'canasta_sync' },
-        { text: '🔎 Buscar Alimento (/canasta)', callback_data: 'canasta_buscar_hint' },
       ],
       BACK_TO_HOME_ROW,
     ],
@@ -108,84 +112,119 @@ export function renderCanastaItems(
   if (items.length === 0) {
     return {
       text:
-        `🔎 No se encontraron precios para <i>"${escHtml(options.searchTerm || '')}"</i>.\n` +
-        `Prueba con <code>/canasta papa</code>, <code>/canasta arroz</code> o <code>/canasta pollo</code>.`,
+        `🔎 No se encontraron precios para <i>"${escHtml(options.searchTerm || '')}"</i> en ninguna tienda o sucursal.\n` +
+        `Prueba con <code>/canasta leche</code>, <code>/canasta arroz</code> o <code>/canasta paneton</code>.`,
       replyMarkup: { inline_keyboard: [BACK_TO_CANASTA_ROW] },
     };
   }
 
-  // Agrupación dual por producto base para contrastar OAP vs Hipermaxi
-  const productMap = new Map<string, { oap?: CanastaItem; hipermaxi?: CanastaItem }>();
-  for (const item of items) {
-    const norm = item.producto.trim().toLowerCase();
-    if (!productMap.has(norm)) {
-      productMap.set(norm, {});
-    }
-    const entry = productMap.get(norm)!;
-    const isHipermaxi = item.fuente && item.fuente.toLowerCase().includes('hipermaxi');
-    if (isHipermaxi) {
-      if (!entry.hipermaxi) entry.hipermaxi = item;
-    } else {
-      if (!entry.oap) entry.oap = item;
-    }
-  }
-
+  const detailButtons: InlineKeyboardButton[] = [];
   let list = '';
-  for (const [, pair] of productMap.entries()) {
-    const mainItem = pair.oap || pair.hipermaxi;
-    if (!mainItem) continue;
 
-    const depto = mainItem.departamento ? ` (${escHtml(mainItem.departamento)})` : '';
-    list += `• <b>${escHtml(mainItem.producto)}</b>${depto}\n`;
-    if (pair.oap) {
-      list += `  🏪 <b>OAP Mercados:</b> Bs ${pair.oap.precio_bs.toFixed(2)} / ${escHtml(pair.oap.unidad_medida)}\n`;
+  // Si es una búsqueda específica, mostrar el desglose omnicanal de todas las sucursales y fuentes
+  if (options.searchTerm) {
+    list = items
+      .slice(0, 10)
+      .map((p, idx) => {
+        const isHiper = p.fuente && p.fuente.toLowerCase().includes('hipermaxi');
+        const icon = isHiper ? '🛒' : p.fuente && p.fuente.toLowerCase().includes('oap') ? '🏪' : '🏬';
+        const depto = p.departamento ? ` [${escHtml(p.departamento)}]` : '';
+        const src = p.fuente ? ` <i>(${escHtml(p.fuente)})</i>` : '';
+        const link = p.enlace ? ` — <a href="${escHtml(p.enlace)}">🔗 Ver</a>` : '';
+
+        if (p.id && detailButtons.length < 4) {
+          detailButtons.push({
+            text: `🔍 #${idx + 1} Ficha: ${formatPriceBs(p.precio_bs)}`,
+            callback_data: `prod_${p.id}`,
+          });
+        }
+
+        return `• ${icon} <b>${escHtml(p.producto)}</b>${depto}${src}\n  💵 <b>${formatPriceBs(p.precio_bs)}</b> / ${escHtml(p.unidad_medida)}${link}`;
+      })
+      .join('\n\n');
+  } else {
+    // Agrupación dual por producto base para contrastar OAP vs Hipermaxi en vistas de categoría
+    const productMap = new Map<string, { oap?: CanastaItem; hipermaxi?: CanastaItem }>();
+    for (const item of items) {
+      const norm = item.producto.trim().toLowerCase();
+      if (!productMap.has(norm)) {
+        productMap.set(norm, {});
+      }
+      const entry = productMap.get(norm)!;
+      const isHipermaxi = item.fuente && item.fuente.toLowerCase().includes('hipermaxi');
+      if (isHipermaxi) {
+        if (!entry.hipermaxi) entry.hipermaxi = item;
+      } else {
+        if (!entry.oap) entry.oap = item;
+      }
     }
-    if (pair.hipermaxi) {
-      list += `  🛒 <b>Hipermaxi:</b>    Bs ${pair.hipermaxi.precio_bs.toFixed(2)} / ${escHtml(pair.hipermaxi.unidad_medida)}\n`;
+
+    for (const [, pair] of productMap.entries()) {
+      const mainItem = pair.oap || pair.hipermaxi;
+      if (!mainItem) continue;
+
+      const depto = mainItem.departamento ? ` (${escHtml(mainItem.departamento)})` : '';
+      list += `• <b>${escHtml(mainItem.producto)}</b>${depto}\n`;
+      if (pair.oap) {
+        list += `  🏪 <b>OAP Mercados:</b> ${formatPriceBs(pair.oap.precio_bs)} / ${escHtml(pair.oap.unidad_medida)}\n`;
+      }
+      if (pair.hipermaxi) {
+        const suc = pair.hipermaxi.fuente ? ` [${escHtml(pair.hipermaxi.fuente)}]` : '';
+        list += `  🛒 <b>Hipermaxi:</b>    ${formatPriceBs(pair.hipermaxi.precio_bs)} / ${escHtml(pair.hipermaxi.unidad_medida)}${suc}\n`;
+      }
+      if (pair.oap && pair.hipermaxi) {
+        const diff = pair.hipermaxi.precio_bs - pair.oap.precio_bs;
+        const pct = ((diff / pair.oap.precio_bs) * 100).toFixed(1);
+        const sign = diff >= 0 ? '+' : '';
+        list += `  📊 <i>Brecha: ${sign}${formatPriceBs(diff)} (${sign}${pct}% en supermercado)</i>\n`;
+      }
+      list += '\n';
+
+      if (mainItem.id && detailButtons.length < 4) {
+        detailButtons.push({
+          text: `🔍 ${mainItem.producto.slice(0, 12)}...`,
+          callback_data: `prod_${mainItem.id}`,
+        });
+      }
     }
-    if (pair.oap && pair.hipermaxi) {
-      const diff = pair.hipermaxi.precio_bs - pair.oap.precio_bs;
-      const pct = ((diff / pair.oap.precio_bs) * 100).toFixed(1);
-      const sign = diff >= 0 ? '+' : '';
-      list += `  📊 <i>Brecha: ${sign}Bs ${diff.toFixed(2)} (${sign}${pct}% en supermercado)</i>\n`;
-    }
-    list += '\n';
   }
 
   if (!list.trim()) {
     list = items
+      .slice(0, 10)
       .map((p) => {
         const isHiper = p.fuente && p.fuente.toLowerCase().includes('hipermaxi');
         const icon = isHiper ? '🛒' : '🏪';
         const src = p.fuente ? ` <i>[${escHtml(p.fuente)}]</i>` : '';
         const depto = p.departamento ? ` (${escHtml(p.departamento)})` : '';
-        return `• ${icon} <b>${escHtml(p.producto)}</b>${depto}\n  💵 <b>Bs ${p.precio_bs.toFixed(2)}</b> / ${escHtml(p.unidad_medida)}${src}`;
+        return `• ${icon} <b>${escHtml(p.producto)}</b>${depto}\n  💵 <b>${formatPriceBs(p.precio_bs)}</b> / ${escHtml(p.unidad_medida)}${src}`;
       })
       .join('\n\n');
   }
 
   let extraKeyboard: InlineKeyboardButton[][] = [];
+  if (detailButtons.length > 0) {
+    extraKeyboard.push(detailButtons.slice(0, 2));
+    if (detailButtons.length > 2) {
+      extraKeyboard.push(detailButtons.slice(2, 4));
+    }
+  }
+
   if (options.cityLabel) {
-    extraKeyboard = [
-      [
-        { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
-        { text: '🌆 Otra Ciudad', callback_data: 'canasta_menu_city' },
-      ],
-    ];
+    extraKeyboard.push([
+      { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
+      { text: '🌆 Otra Ciudad', callback_data: 'canasta_menu_city' },
+    ]);
   } else if (options.fuenteLabel) {
-    extraKeyboard = [
-      [
-        { text: '🏬 Cambiar Fuente', callback_data: 'canasta_menu_fuente' },
-        { text: '📈 Comparar Eje', callback_data: 'canasta_comparar' },
-      ],
-    ];
+    extraKeyboard.push([
+      { text: '🏬 Cambiar Fuente', callback_data: 'canasta_menu_fuente' },
+      { text: '📈 Comparar Eje', callback_data: 'canasta_comparar' },
+    ]);
   } else {
-    extraKeyboard = [
-      [
-        { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
-        { text: '🌆 Cambiar Ciudad', callback_data: 'canasta_menu_city' },
-      ],
-    ];
+    extraKeyboard.push([
+      { text: '📈 Comparar Eje Troncal', callback_data: 'canasta_comparar' },
+      { text: '🌆 Cambiar Ciudad', callback_data: 'canasta_menu_city' },
+    ]);
   }
 
   return {

@@ -1,0 +1,21 @@
+\section{OBJETIVOS}
+
+\subsection{Objetivo General}
+Desarrollar e implementar un sistema integral de minería web multidimensional (contenido, estructura y uso) basado en arquitectura serverless y modelos de series temporales, para la recolección masiva, normalización, análisis analítico y difusión transparente de precios del comercio minorista, infraestructura de salud ciudadana y contrataciones estatales en el eje central de Bolivia.
+
+\subsection{Objetivos Específicos}
+Para alcanzar el objetivo general formulado, se definen los siguientes objetivos específicos:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}]
+    \item \textbf{Desarrollar scrapers resilientes y adaptativos:} Construir agentes de extracción en Node.js y Playwright capaces de eludir los sistemas perimetrales de protección WAF (Radware Bot Manager y hCAPTCHA) mediante contextos de navegador persistentes, sincronizar el desplazamiento dinámico en catálogos con scroll infinito (Hipermaxi) e indexar de manera exhaustiva plataformas construidas sobre Shopify (Farmacorp) y Ant Design (Farmacias Chávez).
+    
+    \item \textbf{Diseñar e implementar una arquitectura de datos escalable:} Modelar e implementar un esquema en Neon Serverless PostgreSQL bajo un paradigma estrella que desacople los atributos descriptivos inmutables en un catálogo maestro (\texttt{catalogo\_productos\_master}) y gestione las observaciones temporales en una tabla particionada mensualmente (\texttt{precios\_historico}), gobernada por funciones disparadoras reactivas PL/pgSQL desacopladas que calculen automáticamente deltas de precio ($\Delta\text{Bs}$ y $\Delta\%$).
+    
+    \item \textbf{Integrar recuperación semántica densa en compras estatales:} Implementar un pipeline de extracción para licitaciones públicas del SICOES en el departamento de La Paz y generar representaciones vectoriales densas de 1024 dimensiones mediante microservicios NVIDIA NIM, almacenándolas en índices HNSW con la extensión \texttt{pgvector} para posibilitar búsquedas conceptuales avanzadas.
+    
+    \item \textbf{Modelar la red de contratación pública mediante algoritmos de grafos:} Estructurar las relaciones entre entidades convocantes, rubros licitados y montos presupuestarios como un grafo bipartito dirigido, implementando los algoritmos de minería de estructura web \textbf{PageRank} y \textbf{HITS} (\textit{Hubs and Authorities}) para identificar concentraciones institucionales y patrones de licitación en compras públicas.
+    
+    \item \textbf{Construir un pipeline de persistencia multimedia en la nube:} Diseñar un mecanismo concurrente de descarga y normalización de imágenes de productos hacia un bucket de almacenamiento de objetos (\textbf{Neon S3}), sirviendo los activos a través de un proxy local con cabeceras de caché extendidas para mitigar la rotura de enlaces por políticas de CORS o tokens efímeros de origen.
+    
+    \item \textbf{Desplegar interfaces ciudadanas multiplataforma:} Desarrollar y poner en producción dos interfaces de consulta de acceso libre: un asistente conversacional interactivo en Telegram (\texttt{@ChatDM7200bot}) con soporte de teclados inline, menús guiados y geolocalización espacial de 83 centros de salud mediante la fórmula de Haversine; y una plataforma web interactiva en Next.js 14 provista de filtros facetados, comparadores de ahorro y mapas integrados.
+\end{enumerate}

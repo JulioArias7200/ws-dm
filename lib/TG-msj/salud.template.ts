@@ -1,10 +1,10 @@
-import { escHtml } from './formatters';
+import { escHtml, formatPriceBs } from './formatters';
 import { BACK_TO_HOME_ROW, BACK_TO_SALUD_ROW } from './buttons';
 import { TemplateResult, ReplyMarkup, InlineKeyboardButton } from './types';
 import type { CentroSaludItem, MedicamentoItem, ComparativaMedicamento } from '../canasta-salud';
 
 /**
- * Plantillas visuales para el Módulo Salud & Precios Farmacéuticos (OSM GPS, Farmacorp y Farmacias Chávez)
+ * Plantillas visuales para el Módulo Salud & Precios Farmacéuticos (OSM GPS, Farmacorp, Farmacias Chávez e Hipermaxi)
  */
 
 export function renderSaludMenu(): TemplateResult {
@@ -12,7 +12,7 @@ export function renderSaludMenu(): TemplateResult {
     `🏥 <b>Módulo Salud & Precios Farmacéuticos — Bolivia 🇧🇴</b>\n\n` +
     `<blockquote><b>Servicios integrados en tiempo real:</b>\n` +
     `1. 🗺️ <b>Directorio OSM:</b> Hospitales, postas y farmacias georreferenciadas con cálculo de distancia GPS.\n` +
-    `2. 💊 <b>Precios Farmacéuticos:</b> Catálogo y comparador en vivo de <b>Farmacorp</b> y <b>Farmacias Chávez</b>.\n\n` +
+    `2. 💊 <b>Precios Farmacéuticos:</b> Catálogo y comparador tri-cadena en vivo de <b>Farmacorp</b>, <b>Farmacias Chávez</b> e <b>Hipermaxi Farmacia</b>.\n\n` +
     `⚡ <b>Atajos rápidos:</b>\n` +
     `• <code>/farmacia paracetamol</code> | <code>/farmacia amoxicilina</code>\n` +
     `• <code>/salud Miraflores</code> | <code>/salud hospital</code>\n` +
@@ -26,10 +26,13 @@ export function renderSaludMenu(): TemplateResult {
         { text: '🏥 Hospitales y Clínicas', callback_data: 'salud_tipo_hospital' },
         { text: '📍 Farmacias Físicas (OSM)', callback_data: 'salud_tipo_pharmacy' },
       ],
-      [{ text: '🔍 Buscar Medicamento (/farmacia)', callback_data: 'farmacia_buscar_hint' }],
       [
         { text: '🟢 Catálogo Farmacorp', callback_data: 'farmacia_cadena_farmacorp' },
         { text: '🔵 Catálogo Chávez', callback_data: 'farmacia_cadena_chavez' },
+      ],
+      [
+        { text: '🟣 Catálogo Hipermaxi Farmacia', callback_data: 'farmacia_cadena_hipermaxi' },
+        { text: '🔍 Buscar Fármaco (/farmacia)', callback_data: 'farmacia_buscar_hint' },
       ],
       BACK_TO_HOME_ROW,
     ],
@@ -41,8 +44,8 @@ export function renderSaludMenu(): TemplateResult {
 export function renderFarmaciaBuscarHint(): TemplateResult {
   return {
     text:
-      `🔍 <b>Búsqueda de Medicamentos — Comparador Farmacéutico</b>\n\n` +
-      `Compara precios en tiempo real entre <b>Farmacorp</b> y <b>Farmacias Chávez</b>.\n\n` +
+      `🔍 <b>Búsqueda de Medicamentos — Comparador Tri-Cadena</b>\n\n` +
+      `Compara precios en tiempo real entre <b>Farmacorp</b>, <b>Farmacias Chávez</b> e <b>Hipermaxi Farmacia</b>.\n\n` +
       `<blockquote>💡 <b>¿Cómo realizar una búsqueda?</b>\n` +
       `1. Escribe el comando seguido del medicamento:\n` +
       `   • <code>/farmacia paracetamol</code>\n` +
@@ -50,7 +53,7 @@ export function renderFarmaciaBuscarHint(): TemplateResult {
       `   • <code>/farmacia ibuprofeno 400</code>\n` +
       `   • <code>/farmacia losartan</code>\n\n` +
       `2. O escribe directamente el nombre en el chat.\n` +
-      `Obtendrás precios, laboratorios, presentaciones y enlaces directos de compra.</blockquote>`,
+      `Obtendrás la disponibilidad, laboratorios, precios y enlaces directos de compra en todas las farmacias.</blockquote>`,
     replyMarkup: { inline_keyboard: [BACK_TO_SALUD_ROW] },
   };
 }
@@ -126,44 +129,64 @@ export function renderMedicamentosComparativa(
     };
   }
 
-  let text = `💊 <b>Comparativa de Precios: "${escHtml(searchTerm)}"</b>\n\n`;
+  let text = `💊 <b>Comparativa de Precios Tri-Cadena: "${escHtml(searchTerm)}"</b>\n\n`;
 
   if (comp.resumenAhorro) {
     const { mejorCadena, precioMin, precioMax, ahorroBs } = comp.resumenAhorro;
     text +=
       `<blockquote>🎯 <b>Resumen de Oportunidad:</b>\n` +
       `• Cadena con menor precio: <b>${escHtml(mejorCadena)}</b>\n` +
-      `• Rango registrado: <b>Bs ${precioMin.toFixed(2)}</b> — <b>Bs ${precioMax.toFixed(2)}</b>\n` +
-      (ahorroBs > 0 ? `• Diferencia / Ahorro potencial: <b>Bs ${ahorroBs.toFixed(2)}</b>\n` : '') +
+      `• Rango registrado: <b>${formatPriceBs(precioMin)}</b> — <b>${formatPriceBs(precioMax)}</b>\n` +
+      (ahorroBs > 0 ? `• Diferencia / Ahorro potencial: <b>${formatPriceBs(ahorroBs)}</b>\n` : '') +
       `</blockquote>\n\n`;
   }
 
-  text += `📋 <b>Opciones encontradas (${comp.items.length}):</b>\n\n`;
-  for (const item of comp.items) {
-    const isFarmacorp = item.cadena.toLowerCase().includes('farmacorp');
-    const icon = isFarmacorp ? '🟢' : '🔵';
-    const linkText = isFarmacorp ? 'Ver en Farmacorp' : 'Ver en Farmacias Chávez';
-    const desc = item.descuento_pct ? ` (🏷️ -${item.descuento_pct}%)` : '';
-    const lab = item.laboratorio && item.laboratorio !== 'No especificado' ? ` [${escHtml(item.laboratorio)}]` : '';
-    const link = item.enlace ? ` — 🔗 <a href="${escHtml(item.enlace)}">${linkText}</a>` : '';
+  // Agrupar por cadena para claridad omnicanal
+  const farmacorpItems = comp.items.filter((i) => i.cadena.toLowerCase().includes('farmacorp'));
+  const chavezItems = comp.items.filter((i) => i.cadena.toLowerCase().includes('chavez'));
+  const hipermaxiItems = comp.items.filter((i) => i.cadena.toLowerCase().includes('hipermaxi'));
 
-    text +=
-      `${icon} <b>${escHtml(item.cadena)}</b>: Bs <b>${item.precio_bs.toFixed(2)}</b>${desc}\n` +
-      `   📝 ${escHtml(item.nombre)}${lab}\n` +
-      `   📦 ${escHtml(item.presentacion || 'Unidad')}${link}\n\n`;
-  }
+  const detailButtons: InlineKeyboardButton[] = [];
 
-  const replyMarkup: ReplyMarkup = {
-    inline_keyboard: [
-      [
-        { text: '🔍 Buscar otro Medicamento', callback_data: 'farmacia_buscar_hint' },
-        { text: '🧭 Farmacias Físicas (OSM)', callback_data: 'salud_tipo_pharmacy' },
-      ],
-      BACK_TO_SALUD_ROW,
-    ],
+  const renderSection = (title: string, icon: string, list: typeof comp.items, linkLabel: string) => {
+    if (list.length === 0) return '';
+    let out = `${icon} <b>${title} (${list.length}):</b>\n`;
+    for (const item of list) {
+      const desc = item.descuento_pct ? ` (🏷️ -${item.descuento_pct}%)` : '';
+      const lab = item.laboratorio && item.laboratorio !== 'No especificado' ? ` [${escHtml(item.laboratorio)}]` : '';
+      const link = item.enlace ? ` — 🔗 <a href="${escHtml(item.enlace)}">${linkLabel}</a>` : '';
+      out += `• <b>${escHtml(item.nombre)}</b>\n`;
+      out += `  💵 <b>${formatPriceBs(item.precio_bs)}</b>${desc} | ${escHtml(item.presentacion || 'Unidad')}${lab}${link}\n`;
+
+      if (item.id && detailButtons.length < 4) {
+        detailButtons.push({
+          text: `🔍 ${item.cadena.split(' ')[0]}: ${formatPriceBs(item.precio_bs)}`,
+          callback_data: `prod_MED_${item.id}`,
+        });
+      }
+    }
+    return out + '\n';
   };
 
-  return { text: text.trim(), replyMarkup };
+  text += renderSection('Farmacorp', '🟢', farmacorpItems, 'Ver en Farmacorp');
+  text += renderSection('Farmacias Chávez', '🔵', chavezItems, 'Ver en Farmacias Chávez');
+  text += renderSection('Hipermaxi Farmacia', '🟣', hipermaxiItems, 'Ver en Hipermaxi');
+
+  const actionRows: InlineKeyboardButton[][] = [];
+  if (detailButtons.length > 0) {
+    actionRows.push(detailButtons.slice(0, 2));
+    if (detailButtons.length > 2) {
+      actionRows.push(detailButtons.slice(2, 4));
+    }
+  }
+
+  actionRows.push([
+    { text: '🔍 Buscar otro Fármaco', callback_data: 'farmacia_buscar_hint' },
+    { text: '🧭 Farmacias Físicas (OSM)', callback_data: 'salud_tipo_pharmacy' },
+  ]);
+  actionRows.push(BACK_TO_SALUD_ROW);
+
+  return { text: text.trim(), replyMarkup: { inline_keyboard: actionRows } };
 }
 
 export function renderMedicamentosCatalogoPaginado(
@@ -180,11 +203,15 @@ export function renderMedicamentosCatalogoPaginado(
     };
   }
 
-  const cadenaKey = cadena.toLowerCase().includes('farmacorp') ? 'farmacorp' : 'chavez';
-  const icon = cadenaKey === 'farmacorp' ? '🟢' : '🔵';
+  const isHipermaxi = cadena.toLowerCase().includes('hipermaxi');
+  const isFarmacorp = cadena.toLowerCase().includes('farmacorp');
+  const cadenaKey = isHipermaxi ? 'hipermaxi' : isFarmacorp ? 'farmacorp' : 'chavez';
+  const icon = isHipermaxi ? '🟣' : isFarmacorp ? '🟢' : '🔵';
   const countLabel = totalCount ? ` — ${totalCount} productos` : '';
 
   let text = `${icon} <b>Catálogo ${escHtml(cadena)} (Pág. ${page} de ${totalPages}${countLabel}):</b>\n\n`;
+
+  const itemButtons: InlineKeyboardButton[] = [];
 
   items.forEach((m, idx) => {
     const itemNum = (page - 1) * 5 + idx + 1;
@@ -193,8 +220,15 @@ export function renderMedicamentosCatalogoPaginado(
     const link = m.enlace ? ` — 🔗 <a href="${escHtml(m.enlace)}">Ver online</a>` : '';
     text +=
       `${itemNum}. <b>${escHtml(m.producto)}</b>\n` +
-      `   💵 <b>Bs ${m.precio_bs.toFixed(2)}</b>${desc}${lab}\n` +
+      `   💵 <b>${formatPriceBs(m.precio_bs)}</b>${desc}${lab}\n` +
       `   📦 ${escHtml(m.presentacion || 'Unidad')}${link}\n\n`;
+
+    if (itemButtons.length < 3) {
+      itemButtons.push({
+        text: `🔍 #${itemNum} Ficha`,
+        callback_data: `prod_MED_${m.id}`,
+      });
+    }
   });
 
   const navRow: InlineKeyboardButton[] = [];
@@ -210,10 +244,15 @@ export function renderMedicamentosCatalogoPaginado(
     navRow.push({ text: 'Siguiente ▶️', callback_data: `farmacia_cat:${cadenaKey}:${page + 1}` });
   }
 
+  const keyboard: InlineKeyboardButton[][] = [];
+  if (itemButtons.length > 0) keyboard.push(itemButtons);
+  keyboard.push(navRow);
+  keyboard.push(BACK_TO_SALUD_ROW);
+
   return {
     text: text.trim(),
     replyMarkup: {
-      inline_keyboard: [navRow, BACK_TO_SALUD_ROW],
+      inline_keyboard: keyboard,
     },
   };
 }

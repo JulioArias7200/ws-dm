@@ -1,0 +1,20 @@
+{
+  "fecha": "2026-11-13T13:36:29.358Z",
+  "fase": "test",
+  "target": "hipermaxi",
+  "reporteModulos": [
+    {
+      "module": "Hipermaxi",
+      "itemsProcessed": 30,
+      "imagesUploaded": 202,
+      "durationSec": "80.4"
+    }
+  ],
+  "totalesBaseDatos": {
+    "canasta_total": 1070,
+    "canasta_s3_imgs": 301,
+    "medicamentos_total": 452,
+    "medicamentos_s3_imgs": 237,
+    "sicoes_total": 127
+  }
+}

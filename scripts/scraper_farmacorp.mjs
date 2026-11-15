@@ -44,6 +44,83 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 const BASE_URL = 'https://farmacorp.com';
 const BACKUP_JSON_PATH = path.resolve(ROOT_DIR, 'data_scraped_farmacorp.json');
 
+// Catálogo Completo de Colecciones Oficiales de Farmacorp
+const FARMACORP_COLLECTIONS = [
+  // Ofertas & Campañas
+  { slug: 'ofertas', nombre: 'Ofertas' },
+  { slug: 'beauty-party', nombre: 'Beauty Party' },
+  { slug: 'outlet-on-cuidado', nombre: 'Outlet Infantil' },
+  { slug: 'revista-de-ofertas', nombre: 'Revista de Ofertas' },
+  { slug: 'lo-nuevo', nombre: 'Lo Nuevo' },
+
+  // Salud & Farmacia
+  { slug: 'medicamentos', nombre: 'Salud y Medicamentos' },
+  { slug: 'medicamentos-y-alivio', nombre: 'Medicamentos y Alivio' },
+  { slug: 'alivio-del-dolor-1', nombre: 'Alivio del Dolor' },
+  { slug: 'primeros-auxilios-1', nombre: 'Botiquín y Primeros Auxilios' },
+  { slug: 'cuidado-digestivo', nombre: 'Cuidado Digestivo' },
+  { slug: 'cuidado-respiratorio', nombre: 'Cuidado Respiratorio' },
+  { slug: 'cuidado-cardiovascular', nombre: 'Cuidado Cardiovascular' },
+  { slug: 'salud-femenina', nombre: 'Salud Femenina' },
+  { slug: 'salud-sexual', nombre: 'Salud Sexual' },
+  { slug: 'dispositivos-y-accesorios-medicos', nombre: 'Dispositivos Médicos' },
+  { slug: 'sueros', nombre: 'Sueros' },
+  { slug: 'cuidado-de-los-sentidos', nombre: 'Cuidado de los Sentidos' },
+  { slug: 'medicamentos-bajo-receta', nombre: 'Medicamentos Bajo Receta' },
+
+  // Belleza
+  { slug: 'beauty', nombre: 'Belleza General' },
+  { slug: 'belleza-facial', nombre: 'Rostro' },
+  { slug: 'mirada-perfecta', nombre: 'Ojos' },
+  { slug: 'labios-perfectos', nombre: 'Labios' },
+  { slug: 'unas', nombre: 'Manicura' },
+  { slug: 'skincare-coreano', nombre: 'Skincare' },
+  { slug: 'accesorios-beauty', nombre: 'Accesorios de Belleza' },
+  { slug: 'coloracion-capilar', nombre: 'Tintes' },
+
+  // Cuidado Personal
+  { slug: 'self-care', nombre: 'Cuidado Personal General' },
+  { slug: 'cuidado-del-cabello', nombre: 'Cuidado Capilar' },
+  { slug: 'cuidado-bucal', nombre: 'Cuidado Bucal' },
+  { slug: 'cuidado-e-higiene-corporal', nombre: 'Cuidado e Higiene' },
+  { slug: 'cuidado-femenino', nombre: 'Cuidado Femenino' },
+  { slug: 'cuidado-masculino', nombre: 'Cuidado Masculino' },
+  { slug: 'adulto-mayor', nombre: 'Adulto Mayor' },
+
+  // Mamá y Bebé
+  { slug: 'mama-bebe', nombre: 'Mamá y Bebé General' },
+  { slug: 'cuidados-del-bebe', nombre: 'Cuidados del Bebé' },
+  { slug: 'leches-y-formulas', nombre: 'Leches y Fórmulas' },
+  { slug: 'panales-y-toallas-humedas', nombre: 'Pañales y Toallitas Húmedas' },
+  { slug: 'mamaderas-chupetes-y-tetinas', nombre: 'Mamaderas y Chupetes' },
+  { slug: 'accesorios-para-bebe', nombre: 'Accesorios para Bebé' },
+  { slug: 'cuidados-de-la-mama', nombre: 'Cuidados de la Mamá' },
+  { slug: 'nutricion-infantil', nombre: 'Nutrición Infantil' },
+
+  // Hogar
+  { slug: 'hogar', nombre: 'Hogar General' },
+  { slug: 'detergentes-y-jabones', nombre: 'Detergentes y Jabones' },
+  { slug: 'papel-higienico', nombre: 'Papel Higiénico' },
+  { slug: 'lavavajillas-y-desengrasantes', nombre: 'Lavavajillas' },
+  { slug: 'ambientadores-y-desinfectantes', nombre: 'Ambientadores y Desinfectantes' },
+  { slug: 'accesorios-de-limpieza', nombre: 'Accesorios de Limpieza' },
+  { slug: 'cocina', nombre: 'Cocina' },
+  { slug: 'electro-hogar', nombre: 'Electro Hogar' },
+  { slug: 'mascotas', nombre: 'Mascotas' },
+
+  // Nuestras Marcas
+  { slug: 'nuestras-marcas', nombre: 'Nuestras Marcas (Catálogo Completo)' },
+
+  // Suplementos y Nutrición
+  { slug: 'vitaminas-suplementos-y-minerales', nombre: 'Suplementos y Nutrición' },
+  { slug: 'snacks-saludables', nombre: 'Snacks Saludables' },
+  { slug: 'proteinas-y-creatinas', nombre: 'Proteínas y Creatinas' },
+  { slug: 'vitaminas-y-suplementos', nombre: 'Vitaminas y Suplementos' },
+
+  // Supermercado
+  { slug: 'supermercado', nombre: 'Supermercado General' }
+];
+
 // ==============================================================================
 // ARGUMENTOS CLI Y CONFIGURACIÓN
 // ==============================================================================
@@ -52,24 +129,34 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const options = {
     pages: 2,
+    allPages: false,
+    allCollections: false,
     collection: 'all', // 'all', 'medicamentos', 'cuidado-personal', etc.
     search: '',
     city: 'La Paz',
     limit: 0,
     dryRun: false,
     headless: true,
-    delayMs: 1200
+    delayMs: 2000
   };
 
   for (const arg of args) {
     if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--no-headless' || arg === '--headed') options.headless = false;
-    else if (arg.startsWith('--pages=')) options.pages = Math.max(1, parseInt(arg.split('=')[1], 10) || 1);
-    else if (arg.startsWith('--collection=')) options.collection = arg.split('=')[1].trim();
+    else if (arg === '--all-pages') {
+      options.allPages = true;
+      options.pages = 0;
+    } else if (arg === '--all-collections' || arg === '--all') {
+      options.allCollections = true;
+    } else if (arg.startsWith('--pages=')) {
+      const val = parseInt(arg.split('=')[1], 10);
+      options.pages = val;
+      if (val === 0) options.allPages = true;
+    } else if (arg.startsWith('--collection=')) options.collection = arg.split('=')[1].trim();
     else if (arg.startsWith('--search=')) options.search = arg.split('=')[1].trim();
     else if (arg.startsWith('--city=')) options.city = arg.split('=')[1].trim();
     else if (arg.startsWith('--limit=')) options.limit = parseInt(arg.split('=')[1], 10) || 0;
-    else if (arg.startsWith('--delay=')) options.delayMs = parseInt(arg.split('=')[1], 10) || 1200;
+    else if (arg.startsWith('--delay=')) options.delayMs = parseInt(arg.split('=')[1], 10) || 2000;
   }
 
   return options;
@@ -109,12 +196,21 @@ function parsePriceBs(rawText) {
     .trim();
   if (!clean) return null;
 
-  // Convertir formato con coma decimal
+  // Convertir formato numérico detectando miles y decimales
   let normalized = clean;
-  if (normalized.includes(',') && !normalized.includes('.')) {
-    normalized = normalized.replace(',', '.');
-  } else if (normalized.includes('.') && normalized.includes(',')) {
-    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  if (normalized.includes(',') && normalized.includes('.')) {
+    if (normalized.indexOf(',') < normalized.indexOf('.')) {
+      normalized = normalized.replace(/,/g, ''); // "1,099.00" -> "1099.00"
+    } else {
+      normalized = normalized.replace(/\./g, '').replace(',', '.'); // "1.099,00" -> "1099.00"
+    }
+  } else if (normalized.includes(',')) {
+    const parts = normalized.split(',');
+    if (parts.length === 2 && parts[1].length === 3 && parts[0].length >= 1) {
+      normalized = normalized.replace(',', '');
+    } else {
+      normalized = normalized.replace(',', '.');
+    }
   }
 
   const num = parseFloat(normalized);
@@ -228,43 +324,85 @@ async function scrapeFarmacorp(browser, options) {
       console.log(`  ↳ Extraídos ${cards.length} productos coincidentes.`);
       allItems.push(...cards);
     } else {
-      // Modo colección paginada
-      const col = options.collection || 'all';
-      console.log(`🌐 Scrapeando colección Farmacorp '${col}' (Páginas solicitadas: ${options.pages})...`);
+      // Modo colección paginada (una sola o todas las del catálogo)
+      const targetCollections = options.allCollections
+        ? FARMACORP_COLLECTIONS
+        : [{ slug: options.collection || 'all', nombre: options.collection || 'General' }];
 
-      for (let p = 1; p <= options.pages; p++) {
-        const pageUrl = `${BASE_URL}/collections/${col}?page=${p}&grid_list=grid-view`;
-        console.log(`  ↳ Cargando Página ${p}/${options.pages}: ${pageUrl}`);
+      let lastReportTime = 0;
 
-        const res = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
-        if (!res || res.status() >= 400) {
-          console.warn(`  ⚠️ HTTP ${res ? res.status() : 'error'} en página ${p}.`);
-          break;
+      for (let cIdx = 0; cIdx < targetCollections.length; cIdx++) {
+        if (options.limit > 0 && allItems.length >= options.limit) break;
+        const colItem = targetCollections[cIdx];
+        const colSlug = colItem.slug;
+
+        console.log(`\n🌐 [COLECCIÓN FARMACORP]: '${colItem.nombre}' (${colSlug}) [${cIdx + 1}/${targetCollections.length}]`);
+
+        // 1. Obtener primera página y detectar total de páginas en el paginador
+        const firstPageUrl = `${BASE_URL}/collections/${colSlug}?page=1&grid_list=grid-view`;
+        const resFirst = await page.goto(firstPageUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        if (!resFirst || resFirst.status() >= 400) {
+          console.warn(`  ⚠️ HTTP ${resFirst ? resFirst.status() : 'error'} al abrir ${colSlug}. Continuando...`);
+          continue;
         }
 
         await page.waitForTimeout(options.delayMs);
 
-        // Validar anti-bot
-        const bodyContent = await page.textContent('body');
-        if (bodyContent.includes('Cloudflare') || bodyContent.includes('Attention Required')) {
-          console.warn('  ⚠️ Desafío anti-bot detectado. Deteniendo paginación pasivamente.');
-          break;
-        }
+        // Detectar total de páginas desde nav.pagination
+        const detectedMaxPage = await page.$$eval(
+          'nav.pagination a, .pagination--inner a, ul.pagination a, [class*="pagination"] a',
+          (links) => {
+            let maxP = 1;
+            for (const l of links) {
+              const txt = l.textContent.trim();
+              const num = parseInt(txt, 10);
+              if (!isNaN(num) && num > maxP) maxP = num;
+            }
+            return maxP;
+          }
+        ).catch(() => 1);
 
-        const cards = await extractCardsFromPage(page, { collection: col, city: options.city });
-        console.log(`    ✓ ${cards.length} productos detectados en página ${p}`);
+        const totalPages = (options.allPages || options.pages <= 0)
+          ? detectedMaxPage
+          : Math.min(options.pages, detectedMaxPage);
 
-        if (cards.length === 0) {
-          console.log('    ℹ️ No hay más productos en la colección.');
-          break;
-        }
+        console.log(`📑 [PAGINACIÓN FARMACORP]: '${colItem.nombre}' -> ${detectedMaxPage} páginas totales en cuadrícula (A procesar: ${totalPages}).`);
 
-        allItems.push(...cards);
+        for (let p = 1; p <= totalPages; p++) {
+          if (options.limit > 0 && allItems.length >= options.limit) break;
+          const pageUrl = `${BASE_URL}/collections/${colSlug}?page=${p}&grid_list=grid-view`;
 
-        // Si se alcanzó el límite general
-        if (options.limit > 0 && allItems.length >= options.limit) {
-          console.log(`  ℹ️ Límite de ${options.limit} ítems alcanzado.`);
-          break;
+          if (p > 1) {
+            const res = await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+            if (!res || res.status() >= 400) {
+              console.warn(`  ⚠️ HTTP ${res ? res.status() : 'error'} en página ${p}. Finalizando paginación de ${colSlug}.`);
+              break;
+            }
+            await page.waitForTimeout(options.delayMs);
+          }
+
+          // Validar anti-bot
+          const bodyContent = await page.textContent('body');
+          if (bodyContent.includes('Cloudflare') || bodyContent.includes('Attention Required')) {
+            console.warn('  ⚠️ Desafío anti-bot detectado. Deteniendo paginación pasivamente según directrices.');
+            break;
+          }
+
+          const cards = await extractCardsFromPage(page, { collection: colSlug, city: options.city });
+
+          if (cards.length === 0) {
+            console.log(`\n📄 [PÁGINAS PROCESADAS]: Final de catálogo alcanzado en página ${p} para ${colSlug}.`);
+            break;
+          }
+
+          allItems.push(...cards);
+
+          // Reporte en consola cada ~5 a 10 segundos (o en la primera página)
+          const now = Date.now();
+          if (now - lastReportTime >= 5000 || p === 1 || p === totalPages) {
+            console.log(`📄 [PÁGINAS PROCESADAS]: ${colItem.nombre} (Pág. ${p}/${totalPages}) -> ${cards.length} detectados (Acumulado: ${allItems.length})`);
+            lastReportTime = now;
+          }
         }
       }
     }
@@ -384,8 +522,11 @@ async function syncToNeon(neonUrl, records) {
       precio_bs = EXCLUDED.precio_bs,
       precio_anterior_bs = EXCLUDED.precio_anterior_bs,
       descuento_pct = EXCLUDED.descuento_pct,
-      enlace = EXCLUDED.enlace,
-      imagen = EXCLUDED.imagen,
+      enlace = COALESCE(EXCLUDED.enlace, medicamentos_precios.enlace),
+      imagen = CASE
+        WHEN medicamentos_precios.imagen LIKE 'farmacias/%' THEN medicamentos_precios.imagen
+        ELSE COALESCE(EXCLUDED.imagen, medicamentos_precios.imagen)
+      END,
       disponible = EXCLUDED.disponible,
       updated_at = NOW();
   `;
@@ -409,12 +550,54 @@ async function syncToNeon(neonUrl, records) {
         r.disponible
       ]);
       inserted++;
+
+      // Sincronización en catálogo maestro e histórico time-series
+      try {
+        const skuId = `farmacorp-${r.producto.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 80)}`;
+        await neonQuery(neonUrl, `
+          INSERT INTO catalogo_productos_master (
+            sku_id, producto, cadena, departamento, categoria, laboratorio, presentacion, enlace_canonica, imagen, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+          ON CONFLICT (sku_id) DO UPDATE SET
+            producto = EXCLUDED.producto,
+            categoria = EXCLUDED.categoria,
+            laboratorio = EXCLUDED.laboratorio,
+            presentacion = EXCLUDED.presentacion,
+            enlace_canonica = COALESCE(EXCLUDED.enlace_canonica, catalogo_productos_master.enlace_canonica),
+            imagen = COALESCE(EXCLUDED.imagen, catalogo_productos_master.imagen),
+            updated_at = NOW();
+        `, [skuId, r.producto, r.cadena, r.departamento, r.categoria, r.laboratorio, r.presentacion, r.enlace, r.imagen]);
+
+        await neonQuery(neonUrl, `
+          INSERT INTO precios_historico (
+            sku_id, fecha, precio_actual_bs, precio_anterior_bs, descuento_pct, delta_precio_bs, delta_porcentaje, disponible
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (sku_id, fecha) DO UPDATE SET
+            precio_actual_bs = EXCLUDED.precio_actual_bs,
+            precio_anterior_bs = EXCLUDED.precio_anterior_bs,
+            descuento_pct = EXCLUDED.descuento_pct,
+            delta_precio_bs = EXCLUDED.delta_precio_bs,
+            delta_porcentaje = EXCLUDED.delta_porcentaje,
+            disponible = EXCLUDED.disponible;
+        `, [
+          skuId,
+          r.fecha,
+          r.precio_bs,
+          r.precio_anterior_bs,
+          r.descuento_pct,
+          r.precio_anterior_bs ? Number((r.precio_bs - r.precio_anterior_bs).toFixed(2)) : 0,
+          r.descuento_pct ? -Math.abs(r.descuento_pct) : 0,
+          r.disponible
+        ]);
+      } catch {
+        // Ignorar si las tablas aún no están migradas
+      }
     } catch (err) {
       console.warn(`  ⚠️ Error en upsert de '${r.producto}': ${err.message}`);
     }
   }
 
-  console.log(`✅ ${inserted}/${records.length} medicamentos de Farmacorp sincronizados en Neon PostgreSQL.`);
+  console.log(`\n✅ [PROCESO REALIZADO CORRECTAMENTE]: ${inserted}/${records.length} medicamentos de Farmacorp sincronizados en Neon PostgreSQL.`);
 
   // Consulta resumen de totales
   try {
@@ -435,10 +618,46 @@ async function syncToNeon(neonUrl, records) {
 }
 
 // ==============================================================================
+// TELEMETRÍA Y CONTROL DE TIEMPOS DE RENDIMIENTO
+// ==============================================================================
+
+function formatDuration(ms) {
+  const totalSec = ms / 1000;
+  const mins = Math.floor(totalSec / 60);
+  const secs = (totalSec % 60).toFixed(1);
+  if (mins === 0) return `${secs} segundos`;
+  return `${mins} min ${secs} seg (${totalSec.toFixed(1)} s)`;
+}
+
+function printTelemetryBanner({ title, startTime, endTime, totalItems, extraInfo = [] }) {
+  const durationMs = endTime - startTime;
+  const durationStr = formatDuration(durationMs);
+  const durationSec = durationMs / 1000;
+  const speed = totalItems > 0 && durationSec > 0 ? (totalItems / durationSec).toFixed(2) : '0.00';
+
+  const startStr = new Date(startTime).toLocaleTimeString('es-BO', { hour12: false });
+  const endStr = new Date(endTime).toLocaleTimeString('es-BO', { hour12: false });
+
+  console.log('\n╔════════════════════════════════════════════════════════════════╗');
+  console.log(`║      ⏱️ TELEMETRÍA Y TIEMPO DE RENDIMIENTO - ${title.padEnd(16)} ║`);
+  console.log('╠════════════════════════════════════════════════════════════════╣');
+  console.log(`║  🕒 Hora de Inicio:        ${startStr.padEnd(35)} ║`);
+  console.log(`║  🏁 Hora de Finalización:  ${endStr.padEnd(35)} ║`);
+  console.log(`║  ⏳ Tiempo Total:          ${durationStr.padEnd(35)} ║`);
+  console.log(`║  📦 Total Productos:       ${(totalItems + ' productos').padEnd(35)} ║`);
+  console.log(`║  ⚡ Velocidad Promedio:    ${(speed + ' productos / segundo').padEnd(35)} ║`);
+  for (const info of extraInfo) {
+    console.log(`║  📌 ${info.padEnd(58)} ║`);
+  }
+  console.log('╚════════════════════════════════════════════════════════════════╝\n');
+}
+
+// ==============================================================================
 // EJECUCIÓN PRINCIPAL
 // ==============================================================================
 
 async function main() {
+  const startTime = Date.now();
   const options = parseArgs();
   const env = loadEnv();
   const todayStr = new Date().toISOString().split('T')[0];
@@ -487,6 +706,20 @@ async function main() {
     } else {
       await syncToNeon(env.NEON_DB, records);
     }
+
+    const endTime = Date.now();
+    printTelemetryBanner({
+      title: 'FARMACORP',
+      startTime,
+      endTime,
+      totalItems: records.length,
+      extraInfo: [
+        `Modo: ${options.search ? 'Búsqueda ("' + options.search + '")' : options.allCollections ? '70+ Colecciones Shopify' : 'Colección ("' + options.collection + '")'}`,
+        `Páginas por colección: ${options.pages}`,
+        `Respaldo JSON: ${BACKUP_JSON_PATH}`,
+        `Base de Datos Neon: ${options.dryRun ? 'No (dry-run)' : 'Sincronizado con Triggers'}`
+      ]
+    });
   } catch (err) {
     console.error('❌ Error fatal en ejecución de scraper Farmacorp:', err);
     process.exitCode = 1;

@@ -229,8 +229,48 @@ async function run() {
       },
     });
 
+    // 18. Callback: farmacia_cadena_hipermaxi (Hipermaxi Farmacia Catálogo)
+    await testEndpoint('Callback: farmacia_cadena_hipermaxi (Hipermaxi Farmacia)', {
+      callback_query: {
+        id: 'cb_hiper_farm',
+        from: { id: 777999, first_name: 'Julio' },
+        message: { message_id: 10, chat: { id: 777999, type: 'private' } },
+        data: 'farmacia_cadena_hipermaxi',
+      },
+    });
+
+    // 19. Comando: /producto 2328 (Ficha Técnica y Sucursales con Separador de Miles)
+    await testEndpoint('Comando: /producto 2328 (Ficha Técnica de Green Label)', {
+      message: {
+        message_id: 7,
+        chat: { id: 777999, type: 'private' },
+        from: { id: 777999, first_name: 'Julio' },
+        text: '/producto 2328',
+      },
+    });
+
+    // 20. Callback: canasta_macro:licores (Macro-Categoría Licores)
+    await testEndpoint('Callback: canasta_macro:licores (Macro-Categoría Licores)', {
+      callback_query: {
+        id: 'cb_licores',
+        from: { id: 777999, first_name: 'Julio' },
+        message: { message_id: 10, chat: { id: 777999, type: 'private' } },
+        data: 'canasta_macro:licores',
+      },
+    });
+
+    // 21. Comando: /salud paracetamol (Búsqueda Omnicanal)
+    await testEndpoint('Comando: /salud paracetamol (Omnicanal Tri-Cadena)', {
+      message: {
+        message_id: 8,
+        chat: { id: 777999, type: 'private' },
+        from: { id: 777999, first_name: 'Julio' },
+        text: '/salud paracetamol',
+      },
+    });
+
     console.log('\n==================================================');
-    console.log('🎉 TODAS LAS 17 PRUEBAS END-TO-END COMPLETADAS CON ÉXITO');
+    console.log('🎉 TODAS LAS 21 PRUEBAS END-TO-END COMPLETADAS CON ÉXITO');
     console.log('==================================================');
   } finally {
     console.log('\n🛑 Deteniendo servidor Next.js...');

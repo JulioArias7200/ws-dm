@@ -1,6 +1,7 @@
 import { neonQuery } from './db';
 
 export interface CanastaItem {
+  id?: string | number;
   fecha: string;
   departamento: string;
   producto: string;
@@ -8,6 +9,8 @@ export interface CanastaItem {
   unidad_medida: string;
   precio_bs: number;
   fuente?: string;
+  imagen?: string | null;
+  enlace?: string | null;
 }
 
 export interface CentroSaludItem {
@@ -44,7 +47,9 @@ export interface ComparativaMedicamento {
   termino: string;
   farmacorpTotal: number;
   chavezTotal: number;
+  hipermaxiTotal?: number;
   items: Array<{
+    id?: number;
     nombre: string;
     cadena: string;
     precio_bs: number;
@@ -183,7 +188,12 @@ export async function getCanastaPrecios(options: {
     const params: unknown[] = [];
     const conditions: string[] = [];
 
-    if (options.departamento && options.departamento.toUpperCase() !== 'ALL') {
+    if (
+      options.departamento &&
+      options.departamento.toUpperCase() !== 'ALL' &&
+      options.departamento.toUpperCase() !== 'TODAS' &&
+      options.departamento.toUpperCase() !== 'TODOS'
+    ) {
       params.push(options.departamento.toUpperCase());
       conditions.push(`UPPER(departamento) = $${params.length}`);
     }
@@ -193,7 +203,7 @@ export async function getCanastaPrecios(options: {
       conditions.push(`fuente ILIKE $${params.length}`);
     }
 
-    if (options.categoria) {
+    if (options.categoria && options.categoria !== 'TODAS' && options.categoria !== 'ALL') {
       params.push(options.categoria);
       conditions.push(`categoria = $${params.length}`);
     }
@@ -203,14 +213,15 @@ export async function getCanastaPrecios(options: {
       conditions.push(`producto ILIKE $${params.length}`);
     }
 
-    const limitVal = Math.min(Math.max(Number(options.limit || 16), 1), 40);
+    const limitVal = options.limit && options.limit > 0 ? options.limit : 1000;
     params.push(limitVal);
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const rows = await neonQuery<Record<string, unknown>>(
       `SELECT DISTINCT ON (producto, fuente)
-              fecha::text AS fecha, departamento, producto, categoria, unidad_medida, precio_bs::float AS precio_bs, fuente
+              id::text AS id, fecha::text AS fecha, INITCAP(LOWER(departamento)) AS departamento, producto, categoria,
+              unidad_medida, precio_bs::float AS precio_bs, fuente, imagen, enlace
        FROM canasta_precios
        ${where}
        ORDER BY producto ASC, fuente ASC, fecha DESC
@@ -219,6 +230,7 @@ export async function getCanastaPrecios(options: {
     );
 
     return rows.map((r) => ({
+      id: r.id ? String(r.id) : undefined,
       fecha: String(r.fecha).slice(0, 10),
       departamento: String(r.departamento),
       producto: String(r.producto),
@@ -226,6 +238,8 @@ export async function getCanastaPrecios(options: {
       unidad_medida: String(r.unidad_medida),
       precio_bs: Number(r.precio_bs),
       fuente: r.fuente ? String(r.fuente) : undefined,
+      imagen: r.imagen ? String(r.imagen) : null,
+      enlace: r.enlace ? String(r.enlace) : null,
     }));
   } catch (err) {
     console.warn('[CANASTA] Error consultando precios OAP/Hipermaxi:', err);
@@ -532,6 +546,9 @@ export async function getMedicamentosPreciosPaginado(options: {
   query?: string;
   page?: number;
   pageSize?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: 'precio_asc' | 'precio_desc' | 'descuento' | 'nombre';
 }): Promise<{
   items: MedicamentoItem[];
   total: number;
@@ -547,13 +564,24 @@ export async function getMedicamentosPreciosPaginado(options: {
     const conditions: string[] = ['disponible = true'];
 
     if (options.cadena) {
-      countParams.push(`%${options.cadena}%`);
-      conditions.push(`cadena ILIKE $${countParams.length}`);
+      const cleanCadena = options.cadena.toLowerCase().replace(/á/g, 'a').trim();
+      countParams.push(`%${cleanCadena}%`);
+      conditions.push(`REPLACE(LOWER(cadena), 'á', 'a') ILIKE $${countParams.length}`);
     }
 
     if (options.query) {
       countParams.push(`%${options.query}%`);
       conditions.push(`(producto ILIKE $${countParams.length} OR laboratorio ILIKE $${countParams.length} OR categoria ILIKE $${countParams.length})`);
+    }
+
+    if (options.minPrice != null && !isNaN(options.minPrice) && options.minPrice >= 0) {
+      countParams.push(options.minPrice);
+      conditions.push(`precio_bs >= $${countParams.length}`);
+    }
+
+    if (options.maxPrice != null && !isNaN(options.maxPrice) && options.maxPrice > 0) {
+      countParams.push(options.maxPrice);
+      conditions.push(`precio_bs <= $${countParams.length}`);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -563,6 +591,15 @@ export async function getMedicamentosPreciosPaginado(options: {
       countParams
     );
 
+    let orderClause = 'precio_bs ASC';
+    if (options.sortBy === 'precio_desc') {
+      orderClause = 'precio_bs DESC';
+    } else if (options.sortBy === 'descuento') {
+      orderClause = 'COALESCE(descuento_pct, 0) DESC, precio_bs ASC';
+    } else if (options.sortBy === 'nombre') {
+      orderClause = 'producto ASC';
+    }
+
     const queryParams = [...countParams, pageSize, offset];
 
     const rows = await neonQuery<Record<string, unknown>>(
@@ -571,7 +608,7 @@ export async function getMedicamentosPreciosPaginado(options: {
               descuento_pct::float AS descuento_pct, enlace, imagen, disponible
        FROM medicamentos_precios
        ${where}
-       ORDER BY precio_bs ASC
+       ORDER BY ${orderClause}
        LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`,
       queryParams
     );
@@ -611,12 +648,21 @@ export async function getMedicamentosPreciosPaginado(options: {
  * Compara precios de un fármaco entre Farmacorp y Farmacias Chávez
  */
 export async function compareMedicamentos(query: string): Promise<ComparativaMedicamento> {
-  const all = await getMedicamentosPrecios({ query, limit: 30 });
+  const all = await getMedicamentosPrecios({ query, limit: 50 });
 
   const farmacorpItems = all.filter((m) => m.cadena.toLowerCase().includes('farmacorp'));
   const chavezItems = all.filter((m) => m.cadena.toLowerCase().includes('chavez'));
+  const hipermaxiItems = all.filter((m) => m.cadena.toLowerCase().includes('hipermaxi'));
 
-  const items = all.slice(0, 8).map((m) => ({
+  // Asegurar representación equilibrada de las 3 cadenas farmacéuticas
+  const combined = [
+    ...farmacorpItems.slice(0, 4),
+    ...chavezItems.slice(0, 4),
+    ...hipermaxiItems.slice(0, 4),
+  ];
+
+  const items = combined.map((m) => ({
+    id: m.id,
     nombre: m.producto,
     cadena: m.cadena,
     precio_bs: m.precio_bs,
@@ -628,12 +674,22 @@ export async function compareMedicamentos(query: string): Promise<ComparativaMed
 
   let resumenAhorro: ComparativaMedicamento['resumenAhorro'];
 
-  if (farmacorpItems.length > 0 && chavezItems.length > 0) {
-    const minF = Math.min(...farmacorpItems.map((m) => m.precio_bs));
-    const minC = Math.min(...chavezItems.map((m) => m.precio_bs));
-    const maxVal = Math.max(minF, minC);
-    const minVal = Math.min(minF, minC);
-    const mejor = minF < minC ? 'Farmacorp' : minC < minF ? 'Farmacias Chávez' : 'Ambas al mismo precio';
+  const cotizaciones: Array<{ cadena: string; minPrice: number }> = [];
+  if (farmacorpItems.length > 0) {
+    cotizaciones.push({ cadena: 'Farmacorp', minPrice: Math.min(...farmacorpItems.map((m) => m.precio_bs)) });
+  }
+  if (chavezItems.length > 0) {
+    cotizaciones.push({ cadena: 'Farmacias Chávez', minPrice: Math.min(...chavezItems.map((m) => m.precio_bs)) });
+  }
+  if (hipermaxiItems.length > 0) {
+    cotizaciones.push({ cadena: 'Hipermaxi Farmacia', minPrice: Math.min(...hipermaxiItems.map((m) => m.precio_bs)) });
+  }
+
+  if (cotizaciones.length >= 2) {
+    cotizaciones.sort((a, b) => a.minPrice - b.minPrice);
+    const minVal = cotizaciones[0].minPrice;
+    const maxVal = cotizaciones[cotizaciones.length - 1].minPrice;
+    const mejor = cotizaciones[0].cadena;
 
     resumenAhorro = {
       mejorCadena: mejor,
@@ -647,8 +703,623 @@ export async function compareMedicamentos(query: string): Promise<ComparativaMed
     termino: query,
     farmacorpTotal: farmacorpItems.length,
     chavezTotal: chavezItems.length,
+    hipermaxiTotal: hipermaxiItems.length,
     items,
     resumenAhorro,
+  };
+}
+
+export interface UnifiedCatalogOptions {
+  query?: string;
+  macroCategoria?: 'canasta' | 'limpieza' | 'licores' | 'farmacia' | 'personal' | 'otros' | 'todas';
+  subcategoria?: string;
+  cadena?: string;
+  departamento?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: 'precio_asc' | 'precio_desc' | 'nombre' | 'descuento';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface UnifiedProductItem {
+  id: string;
+  producto: string;
+  categoria: string;
+  macroCategoria: string;
+  unidad_medida: string;
+  precio_bs: number;
+  precio_anterior_bs?: number | null;
+  descuento_pct?: number | null;
+  cadena: string;
+  departamento: string;
+  imagen: string | null;
+  rawImagen?: string | null;
+  isS3?: boolean;
+  enlace: string | null;
+  laboratorio?: string | null;
+  fecha: string;
+  sector: 'supermercado' | 'farmacia' | 'oap';
+  oap?: { precio_bs: number; fecha: string; fuente?: string };
+  hipermaxi?: { precio_bs: number; fecha: string; fuente?: string; enlace?: string | null };
+  diferencia_bs?: number;
+  diferencia_pct?: number;
+  ahorroFuente?: 'OAP' | 'Hipermaxi' | 'Igual';
+  cotejoDual?: {
+    oapPrecio?: number;
+    hipermaxiPrecio?: number;
+    ahorroBs?: number;
+    ahorroPct?: number;
+    ahorroFuente?: 'OAP' | 'Hipermaxi' | 'Igual';
+  };
+}
+
+export interface UnifiedCatalogResult {
+  items: UnifiedProductItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  macroCounts: {
+    todas: number;
+    canasta: number;
+    limpieza: number;
+    licores: number;
+    farmacia: number;
+    personal: number;
+    otros: number;
+  };
+  filtrosDisponibles: {
+    cadenas: string[];
+    ciudades: string[];
+    subcategorias: string[];
+  };
+}
+
+function resolveProductImage(producto: string, rawImage?: string | null, sector?: string): string {
+  if (rawImage) {
+    if (rawImage.startsWith('http') || rawImage.startsWith('/api/')) return rawImage;
+    return `/api/storage/${rawImage.replace(/^\/+/, '')}`;
+  }
+  const p = producto.toLowerCase();
+  if (sector === 'farmacia') return '/images/salud/medication.svg';
+  if (p.includes('papa')) return '/images/canasta/papa.svg';
+  if (p.includes('pollo')) return '/images/canasta/pollo.svg';
+  if (p.includes('carne') || p.includes('res') || p.includes('cerdo') || p.includes('chuleta'))
+    return '/images/canasta/carne.svg';
+  if (p.includes('arroz')) return '/images/canasta/arroz.svg';
+  if (p.includes('aceite')) return '/images/canasta/aceite.svg';
+  if (p.includes('leche')) return '/images/canasta/leche.svg';
+  if (p.includes('huevo')) return '/images/canasta/huevo.svg';
+  if (
+    p.includes('cebolla') ||
+    p.includes('tomate') ||
+    p.includes('zanahoria') ||
+    p.includes('arveja') ||
+    p.includes('haba')
+  )
+    return '/images/canasta/verdura.svg';
+  return '/images/canasta/alimentos.svg';
+}
+
+/**
+ * Consulta unificada de alto rendimiento sobre Canasta Familiar, Limpieza, Licores, Farmacia y Otros
+ * con paginación SQL nativa, conteo exacto y soporte facetado.
+ */
+export async function getUnifiedCatalogProducts(
+  options: UnifiedCatalogOptions = {}
+): Promise<UnifiedCatalogResult> {
+  const page = Math.max(1, Number(options.page || 1));
+  const pageSize = Math.max(1, Number(options.pageSize || 24));
+  const offset = (page - 1) * pageSize;
+
+  const macroFilter = options.macroCategoria && options.macroCategoria !== 'todas'
+    ? options.macroCategoria
+    : undefined;
+
+  const baseView = `
+    WITH unified AS (
+      SELECT 
+        id::text AS id,
+        fecha::text AS fecha,
+        INITCAP(LOWER(departamento)) AS departamento,
+        producto,
+        categoria,
+        CASE 
+          WHEN categoria ILIKE '%hogar%' OR categoria ILIKE '%limpieza%' THEN 'limpieza'
+          WHEN categoria ILIKE '%bebida%' OR categoria ILIKE '%licor%' OR categoria ILIKE '%cerveza%' OR categoria ILIKE '%vino%' THEN 'licores'
+          WHEN categoria ILIKE '%cuidado personal%' OR categoria ILIKE '%cuidado del bebe%' OR categoria ILIKE '%belleza%' THEN 'personal'
+          WHEN categoria ILIKE '%bazar%' OR categoria ILIKE '%juguet%' OR categoria ILIKE '%textil%' THEN 'otros'
+          ELSE 'canasta'
+        END AS macro_categoria,
+        unidad_medida,
+        precio_bs::float AS precio_bs,
+        NULL::float AS precio_anterior_bs,
+        NULL::float AS descuento_pct,
+        fuente AS cadena,
+        imagen,
+        enlace,
+        NULL::text AS laboratorio,
+        CASE WHEN fuente ILIKE '%oap%' THEN 'oap' ELSE 'supermercado' END AS sector
+      FROM canasta_precios
+
+      UNION ALL
+
+      SELECT 
+        ('MED_' || id)::text AS id,
+        fecha::text AS fecha,
+        INITCAP(LOWER(departamento)) AS departamento,
+        producto,
+        COALESCE(categoria, 'Medicamentos') AS categoria,
+        'farmacia' AS macro_categoria,
+        COALESCE(presentacion, '1 Unidad') AS unidad_medida,
+        precio_bs::float AS precio_bs,
+        precio_anterior_bs::float AS precio_anterior_bs,
+        descuento_pct::float AS descuento_pct,
+        cadena,
+        imagen,
+        enlace,
+        laboratorio,
+        'farmacia' AS sector
+      FROM medicamentos_precios
+    )
+  `;
+
+  // Construir condiciones dinámicas WHERE
+  const conditions: string[] = ['1=1'];
+  const params: unknown[] = [];
+
+  if (macroFilter) {
+    params.push(macroFilter);
+    conditions.push(`macro_categoria = $${params.length}`);
+  }
+
+  if (options.subcategoria && options.subcategoria !== 'TODAS') {
+    params.push(options.subcategoria);
+    conditions.push(`categoria = $${params.length}`);
+  }
+
+  if (options.cadena && options.cadena !== 'TODAS') {
+    params.push(`%${options.cadena}%`);
+    conditions.push(`cadena ILIKE $${params.length}`);
+  }
+
+  if (options.departamento && options.departamento !== 'TODAS' && options.departamento !== 'TODOS') {
+    params.push(options.departamento.toLowerCase());
+    conditions.push(`LOWER(departamento) = $${params.length}`);
+  }
+
+  if (options.query && options.query.trim()) {
+    params.push(`%${options.query.trim()}%`);
+    conditions.push(`(producto ILIKE $${params.length} OR categoria ILIKE $${params.length} OR COALESCE(laboratorio, '') ILIKE $${params.length})`);
+  }
+
+  if (options.minPrice != null && options.minPrice >= 0) {
+    params.push(options.minPrice);
+    conditions.push(`precio_bs >= $${params.length}`);
+  }
+
+  if (options.maxPrice != null && options.maxPrice > 0) {
+    params.push(options.maxPrice);
+    conditions.push(`precio_bs <= $${params.length}`);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  // Cláusula de ordenamiento
+  let orderClause = 'precio_bs ASC';
+  if (options.sortBy === 'precio_desc') {
+    orderClause = 'precio_bs DESC';
+  } else if (options.sortBy === 'nombre') {
+    orderClause = 'producto ASC';
+  } else if (options.sortBy === 'descuento') {
+    orderClause = 'COALESCE(descuento_pct, 0) DESC, precio_bs ASC';
+  }
+
+  // 1. Conteo total con los filtros actuales
+  const countSql = `
+    ${baseView}
+    SELECT COUNT(*)::int AS total
+    FROM unified
+    WHERE ${whereClause}
+  `;
+  const [{ total = 0 }] = await neonQuery<{ total: number }>(countSql, params);
+
+  // 2. Consulta de datos paginados
+  const dataParams = [...params, pageSize, offset];
+  const dataSql = `
+    ${baseView}
+    SELECT *
+    FROM unified
+    WHERE ${whereClause}
+    ORDER BY ${orderClause}
+    LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}
+  `;
+  const rows = await neonQuery<Record<string, unknown>>(dataSql, dataParams);
+
+  // 3. Obtener conteos por macro-categoría para renderizar badges en tiempo real
+  const macroCountsSql = `
+    ${baseView}
+    SELECT macro_categoria, COUNT(*)::int AS c
+    FROM unified
+    GROUP BY macro_categoria
+  `;
+  const countRows = await neonQuery<{ macro_categoria: string; c: number }>(macroCountsSql);
+  const macroMap: Record<string, number> = {
+    todas: 0,
+    canasta: 0,
+    limpieza: 0,
+    licores: 0,
+    farmacia: 0,
+    personal: 0,
+    otros: 0,
+  };
+  for (const cr of countRows) {
+    const k = cr.macro_categoria as keyof typeof macroMap;
+    const cnt = Number(cr.c);
+    if (k in macroMap) macroMap[k] = cnt;
+    macroMap.todas += cnt;
+  }
+
+  const items: UnifiedProductItem[] = rows.map((r) => {
+    const rawImg = r.imagen ? String(r.imagen) : null;
+    const isS3 = Boolean(rawImg && (rawImg.startsWith('canasta/') || rawImg.startsWith('farmacias/')));
+    return {
+      id: String(r.id),
+      producto: String(r.producto),
+      categoria: String(r.categoria || ''),
+      macroCategoria: String(r.macro_categoria),
+      unidad_medida: String(r.unidad_medida || '1 Unidad'),
+      precio_bs: Number(r.precio_bs),
+      precio_anterior_bs: r.precio_anterior_bs != null ? Number(r.precio_anterior_bs) : null,
+      descuento_pct: r.descuento_pct != null ? Number(r.descuento_pct) : null,
+      cadena: String(r.cadena),
+      departamento: String(r.departamento),
+      imagen: resolveProductImage(String(r.producto), rawImg, String(r.sector)),
+      rawImagen: rawImg,
+      isS3,
+      enlace: r.enlace ? String(r.enlace) : null,
+      laboratorio: r.laboratorio ? String(r.laboratorio) : null,
+      fecha: String(r.fecha).slice(0, 10),
+      sector: r.sector as 'supermercado' | 'farmacia' | 'oap',
+    };
+  });
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages,
+    macroCounts: macroMap as UnifiedCatalogResult['macroCounts'],
+    filtrosDisponibles: {
+      cadenas: ['Hipermaxi', 'Farmacorp', 'Farmacias Chavez', 'OAP Bolivia'],
+      ciudades: ['La Paz', 'Santa Cruz', 'Cochabamba'],
+      subcategorias: [
+        'Abarrotes',
+        'Lacteos y derivados',
+        'Carnes',
+        'Frutas y verduras',
+        'Panaderia',
+        'Cuidado del hogar',
+        'Bebidas',
+        'Medicamentos',
+        'Cuidado personal',
+        'Cuidado del bebe',
+        'Bazar',
+        'Congelados',
+        'Fiambres',
+      ],
+    },
+  };
+}
+
+export interface ProductDetailResult {
+  item: UnifiedProductItem;
+  isS3: boolean;
+  s3Key: string | null;
+  rawImagen: string | null;
+  enlace: string | null;
+  sucursales: Array<{
+    cadena: string;
+    departamento: string;
+    precio_bs: number;
+    fecha: string;
+    enlace: string | null;
+  }>;
+  historicoPrecios: Array<{
+    fecha: string;
+    precio_bs: number;
+    delta_bs: number;
+    delta_pct: number;
+    fuente?: string;
+  }>;
+  comparativas: Array<{
+    tienda: string;
+    departamento: string;
+    producto: string;
+    precio_bs: number;
+    diferencia_bs: number;
+    diferencia_pct: number;
+    tipo: 'ahorro' | 'mas_caro' | 'igual';
+    enlace: string | null;
+  }>;
+}
+
+/**
+ * Obtiene el detalle profundo de un producto para la Modal interactiva:
+ * enlace canónico, estado de sincronización S3, histórico de precios,
+ * sucursales disponibles y cotejo con tiendas/farmacias competidoras.
+ */
+export async function getProductDetail(
+  id: string,
+  productoNombre?: string,
+  cadena?: string
+): Promise<ProductDetailResult | null> {
+  const isMed = id.startsWith('MED_');
+  const cleanId = isMed ? id.replace('MED_', '') : id;
+
+  let currentItem: UnifiedProductItem | null = null;
+
+  if (isMed) {
+    const medRows = await neonQuery<Record<string, unknown>>(
+      `SELECT id, fecha::text, departamento, cadena, producto, laboratorio, categoria,
+              presentacion, precio_bs::float, precio_anterior_bs::float, descuento_pct::float,
+              enlace, imagen
+       FROM medicamentos_precios
+       WHERE id = $1`,
+      [Number(cleanId)]
+    );
+    if (medRows.length > 0) {
+      const r = medRows[0];
+      const rawImg = r.imagen ? String(r.imagen) : null;
+      currentItem = {
+        id: `MED_${r.id}`,
+        producto: String(r.producto),
+        categoria: String(r.categoria || 'Medicamentos'),
+        macroCategoria: 'farmacia',
+        unidad_medida: String(r.presentacion || '1 Unidad'),
+        precio_bs: Number(r.precio_bs),
+        precio_anterior_bs: r.precio_anterior_bs != null ? Number(r.precio_anterior_bs) : null,
+        descuento_pct: r.descuento_pct != null ? Number(r.descuento_pct) : null,
+        cadena: String(r.cadena),
+        departamento: String(r.departamento),
+        imagen: resolveProductImage(String(r.producto), rawImg, 'farmacia'),
+        rawImagen: rawImg,
+        isS3: Boolean(rawImg && rawImg.startsWith('farmacias/')),
+        enlace: r.enlace ? String(r.enlace) : null,
+        laboratorio: r.laboratorio ? String(r.laboratorio) : null,
+        fecha: String(r.fecha).slice(0, 10),
+        sector: 'farmacia',
+      };
+    }
+  } else {
+    const canastaRows = await neonQuery<Record<string, unknown>>(
+      `SELECT id, fecha::text, departamento, producto, categoria, unidad_medida,
+              precio_bs::float, fuente, enlace, imagen
+       FROM canasta_precios
+       WHERE id = $1`,
+      [Number(cleanId)]
+    );
+    if (canastaRows.length > 0) {
+      const r = canastaRows[0];
+      const rawImg = r.imagen ? String(r.imagen) : null;
+      const cat = String(r.categoria || '');
+      let macro = 'canasta';
+      if (/hogar|limpieza/i.test(cat)) macro = 'limpieza';
+      else if (/bebida|licor|cerveza|vino/i.test(cat)) macro = 'licores';
+      else if (/personal|bebe|belleza/i.test(cat)) macro = 'personal';
+      else if (/bazar|juguet|textil/i.test(cat)) macro = 'otros';
+
+      currentItem = {
+        id: String(r.id),
+        producto: String(r.producto),
+        categoria: cat,
+        macroCategoria: macro,
+        unidad_medida: String(r.unidad_medida || '1 Unidad'),
+        precio_bs: Number(r.precio_bs),
+        precio_anterior_bs: null,
+        descuento_pct: null,
+        cadena: String(r.fuente || 'Hipermaxi'),
+        departamento: String(r.departamento),
+        imagen: resolveProductImage(String(r.producto), rawImg, 'supermercado'),
+        rawImagen: rawImg,
+        isS3: Boolean(rawImg && rawImg.startsWith('canasta/')),
+        enlace: r.enlace ? String(r.enlace) : null,
+        laboratorio: null,
+        fecha: String(r.fecha).slice(0, 10),
+        sector: String(r.fuente).toLowerCase().includes('oap') ? 'oap' : 'supermercado',
+      };
+    }
+  }
+
+  if (!currentItem) {
+    return null;
+  }
+
+  const prodName = productoNombre || currentItem.producto;
+
+  // 1. Obtener Sucursales disponibles donde existe este producto
+  let sucursales: Array<{
+    cadena: string;
+    departamento: string;
+    precio_bs: number;
+    fecha: string;
+    enlace: string | null;
+  }> = [];
+
+  if (isMed) {
+    const sucRows = await neonQuery<Record<string, unknown>>(
+      `SELECT DISTINCT cadena, departamento, precio_bs::float, fecha::text, enlace
+       FROM medicamentos_precios
+       WHERE producto ILIKE $1
+       ORDER BY precio_bs ASC`,
+      [prodName]
+    );
+    sucursales = sucRows.map((s) => ({
+      cadena: String(s.cadena),
+      departamento: String(s.departamento),
+      precio_bs: Number(s.precio_bs),
+      fecha: String(s.fecha).slice(0, 10),
+      enlace: s.enlace ? String(s.enlace) : null,
+    }));
+  } else {
+    const sucRows = await neonQuery<Record<string, unknown>>(
+      `SELECT DISTINCT fuente AS cadena, departamento, precio_bs::float, fecha::text, enlace
+       FROM canasta_precios
+       WHERE producto ILIKE $1
+       ORDER BY precio_bs ASC`,
+      [prodName]
+    );
+    sucursales = sucRows.map((s) => ({
+      cadena: String(s.cadena),
+      departamento: String(s.departamento),
+      precio_bs: Number(s.precio_bs),
+      fecha: String(s.fecha).slice(0, 10),
+      enlace: s.enlace ? String(s.enlace) : null,
+    }));
+  }
+
+  // 2. Obtener Histórico de Precios
+  const skuPattern = `%${prodName.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}%`;
+  const histRows = await neonQuery<Record<string, unknown>>(
+    `SELECT fecha::text, precio_actual_bs::float AS precio_bs,
+            COALESCE(delta_precio_bs, 0)::float AS delta_bs,
+            COALESCE(delta_porcentaje, 0)::float AS delta_pct
+     FROM precios_historico
+     WHERE sku_id ILIKE $1
+     ORDER BY fecha DESC
+     LIMIT 12`,
+    [skuPattern]
+  );
+
+  let historicoPrecios: Array<{
+    fecha: string;
+    precio_bs: number;
+    delta_bs: number;
+    delta_pct: number;
+    fuente?: string;
+  }> = [];
+
+  if (histRows.length > 0) {
+    historicoPrecios = histRows.map((h) => ({
+      fecha: String(h.fecha).slice(0, 10),
+      precio_bs: Number(h.precio_bs),
+      delta_bs: Number(h.delta_bs),
+      delta_pct: Number(h.delta_pct),
+    }));
+  } else {
+    // Si aún no hay suficientes datos en la partición histórica, inferir de registros de captura
+    const fallbackHist = isMed
+      ? await neonQuery<Record<string, unknown>>(
+          `SELECT fecha::text, precio_bs::float, cadena AS fuente
+           FROM medicamentos_precios
+           WHERE producto ILIKE $1
+           ORDER BY fecha DESC LIMIT 6`,
+          [prodName]
+        )
+      : await neonQuery<Record<string, unknown>>(
+          `SELECT fecha::text, precio_bs::float, fuente
+           FROM canasta_precios
+           WHERE producto ILIKE $1
+           ORDER BY fecha DESC LIMIT 6`,
+          [prodName]
+        );
+
+    historicoPrecios = fallbackHist.map((f, idx, arr) => {
+      const nextP = arr[idx + 1] ? Number(arr[idx + 1].precio_bs) : Number(f.precio_bs);
+      const currP = Number(f.precio_bs);
+      const delta = currP - nextP;
+      const pct = nextP > 0 ? (delta / nextP) * 100 : 0;
+      return {
+        fecha: String(f.fecha).slice(0, 10),
+        precio_bs: currP,
+        delta_bs: Math.round(delta * 100) / 100,
+        delta_pct: Math.round(pct * 10) / 10,
+        fuente: String(f.fuente || currentItem?.cadena),
+      };
+    });
+  }
+
+  // 3. Comparativa con otras tiendas o farmacias competidoras
+  const comparativas: Array<{
+    tienda: string;
+    departamento: string;
+    producto: string;
+    precio_bs: number;
+    diferencia_bs: number;
+    diferencia_pct: number;
+    tipo: 'ahorro' | 'mas_caro' | 'igual';
+    enlace: string | null;
+  }> = [];
+
+  const basePrice = currentItem.precio_bs;
+
+  if (isMed) {
+    // Si es farmacia, buscar en la otra cadena (Farmacorp vs Chavez)
+    const otherChainRows = await neonQuery<Record<string, unknown>>(
+      `SELECT cadena, departamento, producto, precio_bs::float, enlace
+       FROM medicamentos_precios
+       WHERE cadena <> $1 AND (producto ILIKE $2 OR categoria ILIKE $3)
+       ORDER BY precio_bs ASC
+       LIMIT 4`,
+      [currentItem.cadena, `%${prodName.split(' ')[0]}%`, currentItem.categoria]
+    );
+
+    for (const oc of otherChainRows) {
+      const pComp = Number(oc.precio_bs);
+      const diffBs = Math.round((pComp - basePrice) * 100) / 100;
+      const diffPct = basePrice > 0 ? Math.round(((pComp - basePrice) / basePrice) * 1000) / 10 : 0;
+      comparativas.push({
+        tienda: String(oc.cadena),
+        departamento: String(oc.departamento),
+        producto: String(oc.producto),
+        precio_bs: pComp,
+        diferencia_bs: diffBs,
+        diferencia_pct: diffPct,
+        tipo: diffBs < 0 ? 'ahorro' : diffBs > 0 ? 'mas_caro' : 'igual',
+        enlace: oc.enlace ? String(oc.enlace) : null,
+      });
+    }
+  } else {
+    // Si es supermercado, buscar cotejo en OAP Bolivia o productos similares
+    const oapRows = await neonQuery<Record<string, unknown>>(
+      `SELECT fuente, departamento, producto, precio_bs::float, enlace
+       FROM canasta_precios
+       WHERE (fuente ILIKE '%OAP%' OR fuente <> $1) AND producto ILIKE $2
+       ORDER BY precio_bs ASC
+       LIMIT 4`,
+      [currentItem.cadena, `%${prodName.split(' ')[0]}%`]
+    );
+
+    for (const oc of oapRows) {
+      const pComp = Number(oc.precio_bs);
+      const diffBs = Math.round((pComp - basePrice) * 100) / 100;
+      const diffPct = basePrice > 0 ? Math.round(((pComp - basePrice) / basePrice) * 1000) / 10 : 0;
+      comparativas.push({
+        tienda: String(oc.fuente),
+        departamento: String(oc.departamento),
+        producto: String(oc.producto),
+        precio_bs: pComp,
+        diferencia_bs: diffBs,
+        diferencia_pct: diffPct,
+        tipo: diffBs < 0 ? 'ahorro' : diffBs > 0 ? 'mas_caro' : 'igual',
+        enlace: oc.enlace ? String(oc.enlace) : null,
+      });
+    }
+  }
+
+  return {
+    item: currentItem,
+    isS3: currentItem.isS3 ?? false,
+    s3Key: currentItem.isS3 ? (currentItem.rawImagen ?? null) : null,
+    rawImagen: currentItem.rawImagen ?? null,
+    enlace: currentItem.enlace ?? null,
+    sucursales,
+    historicoPrecios,
+    comparativas,
   };
 }
 

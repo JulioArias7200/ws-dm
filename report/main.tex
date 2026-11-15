@@ -1,0 +1,233 @@
+\documentclass[12pt,letterpaper]{article}
+
+% --- Paquetes Fundamentales ---
+\usepackage[spanish,es-tabla,es-noquoting]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{
+    top=2.54cm,
+    bottom=2.54cm,
+    left=2.54cm,
+    right=2.54cm,
+    headheight=15pt
+}
+
+% --- Paquetes Matemáticos y Científicos ---
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+\usepackage{bm}
+\usepackage{enumitem}
+\usepackage[round,authoryear]{natbib}
+
+% --- Paquetes de Tablas y Formato ---
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{colortbl}
+
+% Columnas personalizadas para tabularx con alineación controlada
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\newcolumntype{R}{>{\raggedleft\arraybackslash}X}
+
+% --- Formato APA 7 para Títulos de Tablas y Figuras ---
+\usepackage{caption}
+\captionsetup[table]{
+    labelfont=bf,
+    textfont=it,
+    labelsep=newline,
+    justification=raggedright,
+    singlelinecheck=false
+}
+\captionsetup[figure]{
+    labelfont=bf,
+    textfont=it,
+    labelsep=newline,
+    justification=raggedright,
+    singlelinecheck=false
+}
+
+% --- Gráficos, Colores y Diagramas ---
+\usepackage{graphicx}
+\graphicspath{{figuras/}{../static/img/}}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, arrows.meta, positioning, calc, trees, shadows, fit, backgrounds, babel}
+
+% Definición de Colores Institucionales y de Acento
+\definecolor{primaryblue}{RGB}{24, 76, 120}
+\definecolor{secondaryblue}{RGB}{41, 128, 185}
+\definecolor{darkgray}{RGB}{50, 50, 50}
+\definecolor{lightgray}{RGB}{245, 247, 250}
+\definecolor{tableheader}{RGB}{220, 230, 242}
+\definecolor{accentgreen}{RGB}{39, 174, 96}
+\definecolor{accentorange}{RGB}{211, 84, 0}
+\definecolor{accentred}{RGB}{192, 57, 43}
+
+% --- Cajas y Énfasis ---
+\usepackage[many]{tcolorbox}
+\newtcolorbox{resumenbox}{
+    colback=lightgray,
+    colframe=primaryblue,
+    arc=3mm,
+    boxrule=1.2pt,
+    left=12pt,
+    right=12pt,
+    top=8pt,
+    bottom=8pt
+}
+
+\newtcolorbox{interpretacionbox}{
+    colback=white,
+    colframe=secondaryblue!70!black,
+    arc=2mm,
+    boxrule=0.8pt,
+    fonttitle=\bfseries\small,
+    coltitle=white,
+    title=Interpretación Técnica y Práctica,
+    left=10pt,
+    right=10pt,
+    top=8pt,
+    bottom=8pt
+}
+
+% --- Encabezados y Pies de Página según APA 7 ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{darkgray}\textit{Minería Web}}
+\fancyhead[R]{\small\thepage}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% --- Macros de Notas de Tablas y Figuras en Estándar APA 7 ---
+\newcommand{\tablenote}[1]{%
+    \vspace{2mm}%
+    \begin{minipage}{\linewidth}%
+        \footnotesize\textit{Nota.} #1%
+    \end{minipage}%
+}
+\newcommand{\figurenote}[1]{%
+    \vspace{2mm}%
+    \begin{minipage}{\linewidth}%
+        \footnotesize\textit{Nota.} #1%
+    \end{minipage}%
+}
+
+% --- Títulos de Secciones ---
+\usepackage{titlesec}
+\titleformat{\section}
+    {\normalfont\Large\bfseries\color{primaryblue}}{\thesection.}{0.8em}{}
+\titleformat{\subsection}
+    {\normalfont\large\bfseries\color{secondaryblue}}{\thesubsection.}{0.6em}{}
+\titleformat{\subsubsection}
+    {\normalfont\normalsize\bfseries\itshape\color{darkgray}}{\thesubsubsection.}{0.5em}{}
+
+% --- Hipervínculos ---
+\usepackage{hyperref}
+\usepackage{xurl}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    citecolor=secondaryblue,
+    urlcolor=secondaryblue,
+    pdftitle={Sistema Integral de Minería Web Multidimensional para el Monitoreo de Precios, Salud y Contrataciones en Bolivia},
+    pdfauthor={Univ. Julio Nelson Arias Cruz},
+    pdfsubject={Minería de Datos - Web Mining},
+    pdfkeywords={Web Mining, Web Content Mining, Web Structure Mining, Web Usage Mining, PageRank, HITS, Scraping Resiliente, Neon PostgreSQL, Next.js, Telegram Bot}
+}
+\emergencystretch=3em
+\tolerance=2000
+
+% --- Entornos de Código ---
+\usepackage{listings}
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{lightgray},
+    keywordstyle=\color{primaryblue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{accentgreen},
+    numbers=left,
+    numberstyle=\tiny\color{darkgray},
+    stepnumber=1,
+    tabsize=2,
+    showstringspaces=false
+}
+\lstdefinelanguage{json}{
+    basicstyle=\ttfamily\footnotesize,
+    string=[s]{"}{"},
+    stringstyle=\color{accentgreen},
+    comment=[l]{:},
+    commentstyle=\color{primaryblue}\bfseries,
+    keywords={true, false, null},
+    keywordstyle=\color{accentorange}\bfseries
+}
+
+\setlength{\parindent}{1.27cm}
+\setlength{\parskip}{0pt}
+
+\begin{document}
+
+% ----------------------------------------------------
+% PORTADA INSTITUCIONAL
+% ----------------------------------------------------
+\input{secciones/00_portada.tex}
+
+% ----------------------------------------------------
+% TABLA DE CONTENIDO E ÍNDICES SEGÚN APA 7
+% ----------------------------------------------------
+\newpage
+\pagenumbering{roman}
+\setcounter{page}{2}
+\phantomsection
+\addcontentsline{toc}{section}{ÍNDICE GENERAL}
+\tableofcontents
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{section}{ÍNDICE DE FIGURAS}
+\listoffigures
+
+\newpage
+\phantomsection
+\addcontentsline{toc}{section}{ÍNDICE DE TABLAS}
+\listoftables
+
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+% ----------------------------------------------------
+% SECCIONES ESTRUCTURALES DEL INFORME
+% ----------------------------------------------------
+\input{secciones/01_introduccion.tex}
+\input{secciones/02_antecedentes.tex}
+\input{secciones/03_problematica.tex}
+\input{secciones/04_objetivos.tex}
+\input{secciones/05_justificacion.tex}
+\input{secciones/06_marco_teorico.tex}
+\input{secciones/07_metodologia.tex}
+\input{secciones/08_marco_practico.tex}
+\input{secciones/09_herramientas.tex}
+\input{secciones/10_resultados.tex}
+\input{secciones/11_arquitectura.tex}
+\input{secciones/12_conclusiones.tex}
+\input{secciones/13_recursos_enlaces.tex}
+\input{secciones/14_anexos.tex}
+
+% ----------------------------------------------------
+% REFERENCIAS BIBLIOGRÁFICAS
+% ----------------------------------------------------
+\newpage
+\phantomsection
+\addcontentsline{toc}{section}{REFERENCIAS BIBLIOGRÁFICAS}
+\bibliographystyle{apalike}
+\bibliography{secciones/bibliografia}
+
+\end{document}

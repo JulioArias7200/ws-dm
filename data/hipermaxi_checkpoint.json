@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-11-15T19:22:40.008Z",
+  "branchSlug": "hipermaxi-blanco-galindo",
+  "lastCategory": "granos-y-hortalizas",
+  "totalItems": 4701,
+  "sampleItems": [
+    {
+      "id": "005205",
+      "title": "Maiz de Somo Hipermaxi kg",
+      "precio": "Bs 21.00"
+    },
+    {
+      "id": "005491",
+      "title": "Maiz para Tujure Hipermaxi kg",
+      "precio": "Bs 21.00"
+    },
+    {
+      "id": "005206",
+      "title": "Api Hipermaxi kg",
+      "precio": "Bs 20.00"
+    },
+    {
+      "id": "005178",
+      "title": "Garbanzo Hipermaxi kg",
+      "precio": "Bs 42.00"
+    },
+    {
+      "id": "005119",
+      "title": "Arvejas Fresca Desgranada kg",
+      "precio": "Bs 35.90"
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{ÍNDICE GENERAL}{\es@scroman {ii}}{section*.1}%
+\contentsline {section}{ÍNDICE DE FIGURAS}{\es@scroman {iv}}{section*.2}%
+\contentsline {section}{ÍNDICE DE TABLAS}{\es@scroman {v}}{section*.3}%
+\contentsline {section}{\numberline {1}INTRODUCCIÓN}{1}{section.1}%
+\contentsline {section}{\numberline {2}ANTECEDENTES}{2}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Recolección de Precios y Monitoreo de Mercado en Bolivia}{2}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}El Portal de Contrataciones Estatales (SICOES)}{2}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Evolución Tecnológica de las Plataformas Web y el Auge de los WAF}{3}{subsection.2.3}%
+\contentsline {section}{\numberline {3}PLANTEAMIENTO DEL PROBLEMA}{3}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Descripción del Problema y Asimetría de Mercado}{3}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Vulnerabilidad de los Mecanismos de Extracción Tradicionales}{4}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Inadecuación de Modelos de Base de Datos Convencionales}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Pregunta Formal de Investigación e Hipótesis}{5}{subsection.3.4}%
+\contentsline {section}{\numberline {4}OBJETIVOS}{5}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Objetivo General}{5}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Objetivos Específicos}{5}{subsection.4.2}%
+\contentsline {section}{\numberline {5}JUSTIFICACIÓN}{6}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Justificación Social y Ciudadana}{6}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Justificación Económica y de Transparencia}{7}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Justificación Técnica y de Ingeniería}{7}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Justificación Académica e Institucional}{7}{subsection.5.4}%
+\contentsline {section}{\numberline {6}MARCO TEÓRICO Y FUNDAMENTOS MATEMÁTICOS}{7}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Taxonomía Clásica de la Minería Web}{7}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Modelos de Contenido Web, DOM y Renderizado Dinámico}{8}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Minería de Estructura Web: Algoritmos PageRank y HITS}{8}{subsection.6.3}%
+\contentsline {subsubsection}{\numberline {6.3.1}Algoritmo PageRank}{8}{subsubsection.6.3.1}%
+\contentsline {subsubsection}{\numberline {6.3.2}Algoritmo HITS (Hubs and Authorities)}{9}{subsubsection.6.3.2}%
+\contentsline {subsection}{\numberline {6.4}Recuperación Semántica Vectorial y Similitud Coseno}{9}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}Distancia Geodésica Espacial: Fórmula de Haversine}{10}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}Formulación de Series de Tiempo de Precios y Variaciones}{10}{subsection.6.6}%
+\contentsline {section}{\numberline {7}METODOLOGÍA DE DESARROLLO}{11}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Fases de la Metodología Adaptada}{11}{subsection.7.1}%
+\contentsline {section}{\numberline {8}MARCO PRÁCTICO E IMPLEMENTACIÓN TÉCNICA}{12}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Ingeniería de Extracción Resiliente (Web Content Mining)}{12}{subsection.8.1}%
+\contentsline {subsubsection}{\numberline {8.1.1}Scraper Hipermaxi: Evasión de Radware y Detección de Scroll Infinito}{12}{subsubsection.8.1.1}%
+\contentsline {subsubsection}{\numberline {8.1.2}Scraper Farmacorp: Paginación Numérica en Shopify}{14}{subsubsection.8.1.2}%
+\contentsline {subsubsection}{\numberline {8.1.3}Scraper Farmacias Chávez: Decodificación de Paginación Ant Design}{14}{subsubsection.8.1.3}%
+\contentsline {subsection}{\numberline {8.2}Pipeline Multimedia y Persistencia en Neon Object Storage S3}{15}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Arquitectura de Base de Datos y Triggers Reactivos en Neon Serverless}{15}{subsection.8.3}%
+\contentsline {subsubsection}{\numberline {8.3.1}Modelo Estrella y Particionamiento Temporal}{15}{subsubsection.8.3.1}%
+\contentsline {subsubsection}{\numberline {8.3.2}Resolución de Triggers Reactivos y Desacoplamiento de Esquemas}{16}{subsubsection.8.3.2}%
+\contentsline {subsubsection}{\numberline {8.3.3}Justificación Técnica del Diagrama Entidad-Relación Físico}{16}{subsubsection.8.3.3}%
+\contentsline {subsection}{\numberline {8.4}Asistente Conversacional Telegram (Web Usage Mining)}{18}{subsection.8.4}%
+\contentsline {subsubsection}{\numberline {8.4.1}Arquitectura de Enrutamiento Telegraf y Teclados Interactivos Inline}{18}{subsubsection.8.4.1}%
+\contentsline {subsubsection}{\numberline {8.4.2}Manejo de Sesiones y Minería de Uso Web}{18}{subsubsection.8.4.2}%
+\contentsline {subsection}{\numberline {8.5}Plataforma Web Interactiva en Next.js 14}{20}{subsection.8.5}%
+\contentsline {section}{\numberline {9}HERRAMIENTAS Y ENTORNO DE DESARROLLO}{20}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Telemetría de Consola y Monitoreo de Extracción en Vivo}{20}{subsection.9.1}%
+\contentsline {section}{\numberline {10}RESULTADOS Y MÉTRICAS AUDITADAS}{23}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Volumetría y Recuentos Reales del Catálogo de Datos}{23}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Comparativa Empírica de Precios y Detección de Ahorro Ciudadano}{23}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Métricas de Rendimiento y Latencia Operativa}{26}{subsection.10.3}%
+\contentsline {section}{\numberline {11}ARQUITECTURA DEL SISTEMA}{26}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Arquitectura General del Sistema End-to-End}{26}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Modelo Relacional Estrella de Datos en Neon PostgreSQL}{27}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.3}Topología del Grafo de Contrataciones Estatales SICOES}{27}{subsection.11.3}%
+\contentsline {section}{\numberline {12}CONCLUSIONES Y RECOMENDACIONES}{27}{section.12}%
+\contentsline {subsection}{\numberline {12.1}Conclusiones}{29}{subsection.12.1}%
+\contentsline {subsection}{\numberline {12.2}Recomendaciones y Trabajo Futuro}{29}{subsection.12.2}%
+\contentsline {section}{\numberline {13}RECURSOS Y ENLACES DEL PROYECTO}{30}{section.13}%
+\contentsline {subsection}{\numberline {13.1}Interfaces y Repositorios Oficiales del Proyecto}{30}{subsection.13.1}%
+\contentsline {subsection}{\numberline {13.2}Directorio de Servicios Retail y Farmacéuticos Utilizados}{31}{subsection.13.2}%
+\contentsline {subsection}{\numberline {13.3}Servicios Gubernamentales, Estadísticos y Geoespaciales}{31}{subsection.13.3}%
+\contentsline {subsection}{\numberline {13.4}Servicios en la Nube, Almacenamiento, IA y APIs Internas}{31}{subsection.13.4}%
+\contentsline {section}{\numberline {14}ANEXOS TÉCNICOS}{31}{section.14}%
+\contentsline {subsection}{\numberline {14.1}Anexo A: Definición del Esquema DDL en Neon PostgreSQL (schema.sql)}{32}{subsection.14.1}%
+\contentsline {subsection}{\numberline {14.2}Anexo B: Procedimiento de Backfill In-Engine (backfill.sql)}{35}{subsection.14.2}%
+\contentsline {subsection}{\numberline {14.3}Anexo C: Catálogo Técnico de Selectores DOM Validados}{35}{subsection.14.3}%
+\contentsline {section}{REFERENCIAS BIBLIOGRÁFICAS}{36}{section*.21}%

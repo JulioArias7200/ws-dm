@@ -1,0 +1,140 @@
+\section{ARQUITECTURA DEL SISTEMA}
+
+La arquitectura del sistema responde a un diseño desacoplado, modular y altamente escalable, organizado en cuatro capas fundamentales: Capa de Extracción y Adquisición, Capa de Almacenamiento y Persistencia Serverless, Capa de Servicios y APIs, y Capa de Presentación e Interacción Ciudadana.
+
+\subsection{Arquitectura General del Sistema End-to-End}
+En la Figura~\ref{fig:tikz_arquitectura} se describe el flujo de datos completo a través de las distintas capas del ecosistema.
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Arquitectura General del Sistema de Minería Web End-to-End}
+    \label{fig:tikz_arquitectura}
+    \resizebox{0.98\linewidth}{!}{%
+    \begin{tikzpicture}[
+        node distance=1.4cm and 1.8cm,
+        box/.style={rectangle, draw=primaryblue, fill=lightgray, rounded corners=3pt, thick, align=center, font=\footnotesize\bfseries, inner sep=6pt},
+        cloudbox/.style={rectangle, draw=secondaryblue, fill=white, rounded corners=4pt, dashed, thick, align=center, font=\footnotesize, inner sep=6pt},
+        dbbox/.style={cylinder, draw=accentorange, fill=orange!10, shape border rotate=90, aspect=0.25, thick, align=center, font=\footnotesize\bfseries, inner sep=5pt},
+        line/.style={draw=primaryblue, -{Latex[length=2.5mm]}, thick}
+    ]
+        % Nodos de Fuentes Web
+        \node[box, fill=blue!10] (src1) {Hipermaxi\\{\scriptsize (Angular + Radware)}};
+        \node[box, fill=blue!10, below=0.6cm of src1] (src2) {Farmacorp\\{\scriptsize (Shopify)}};
+        \node[box, fill=blue!10, below=0.6cm of src2] (src3) {Farmacias Chávez\\{\scriptsize (Next.js + AntD)}};
+        \node[box, fill=blue!10, below=0.6cm of src3] (src4) {SICOES / OAP / OSM\\{\scriptsize (Portales y APIs)}};
+
+        % Contenedor de Fuentes
+        \begin{scope}[on background layer]
+            \node[cloudbox, fit=(src1) (src4), label=above:{\footnotesize\bfseries Fuentes Web Externas}] (sources) {};
+        \end{scope}
+
+        % Nodos de Extracción y Procesamiento
+        \node[box, fill=green!10, right=1.6cm of src2] (crawlers) {Agentes Playwright\\{\scriptsize Node.js + Contexto Persistente}\\{\scriptsize Evasión WAF y Scroll}};
+        \node[box, fill=green!10, right=1.6cm of src4] (s3sync) {Pipeline Multimedia\\{\scriptsize Sincronización S3 Assets}};
+
+        % Nodos de Almacenamiento Neon
+        \node[dbbox, right=1.6cm of crawlers] (neon) {Neon Serverless\\PostgreSQL 16\\{\scriptsize Catálogo Maestro}\\{\scriptsize Histórico Particionado}};
+        \node[box, fill=yellow!15, below=0.8cm of neon] (s3bucket) {Neon Object\\Storage S3\\{\scriptsize Bucket Assets}};
+
+        % Capa de Servicios y AI
+        \node[box, fill=purple!10, right=1.6cm of neon] (backend) {Backend Next.js 14\\{\scriptsize Endpoints REST / API}\\{\scriptsize Telemetría y Haversine}};
+        \node[box, fill=purple!10, above=0.8cm of backend] (nvidia) {NVIDIA NIM\\{\scriptsize Embeddings 1024d}};
+
+        % Capa de Presentación
+        \node[box, fill=red!10, right=1.6cm of backend] (tgbot) {Telegram Bot\\{\scriptsize @ChatDM7200bot}\\{\scriptsize Teclados Inline}};
+        \node[box, fill=red!10, above=0.8cm of tgbot] (webdash) {Plataforma Web\\{\scriptsize Dashboards /canasta}\\{\scriptsize Mapas /salud}};
+
+        % Conexiones
+        \path[line] (src1.east) -- ++(0.5,0) |- (crawlers.west);
+        \path[line] (src2.east) -- (crawlers.west);
+        \path[line] (src3.east) -- ++(0.5,0) |- (crawlers.west);
+        \path[line] (src4.east) -- (s3sync.west);
+        
+        \path[line] (crawlers.east) -- node[above, font=\tiny] {Triggers PL/pgSQL} (neon.west);
+        \path[line] (s3sync.east) -- (s3bucket.west);
+        \path[line] (crawlers.south) -- (s3sync.north);
+
+        \path[line] (neon.east) -- (backend.west);
+        \path[line] (s3bucket.east) -| (backend.south);
+        \path[line] (nvidia.south) -- (backend.north);
+        \path[line] (neon.north) |- (nvidia.west);
+
+        \path[line] (backend.east) -- (tgbot.west);
+        \path[line] (backend.east) -- ++(0.6,0) |- (webdash.west);
+    \end{tikzpicture}%
+    }
+    \figurenote{Diagrama de bloques del ecosistema integral. Ilustra la trazabilidad del dato desde la adquisición en plataformas de comercio electrónico mediante Playwright, pasando por el almacenamiento reactivo en Neon PostgreSQL y S3, hasta su entrega en Next.js y Telegram.}
+\end{figure}
+
+\subsection{Modelo Relacional Estrella de Datos en Neon PostgreSQL}
+La persistencia de datos en Neon PostgreSQL adopta un modelo estrella concebido para analítica de series temporales. En la Figura~\ref{fig:tikz_star_schema} se representa la interrelación lógica de los esquemas gobernada por los disparadores reactivos.
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Esquema Relacional en Modelo Estrella y Flujo Reactivo de Triggers}
+    \label{fig:tikz_star_schema}
+    \resizebox{0.95\linewidth}{!}{%
+    \begin{tikzpicture}[
+        node distance=1.2cm and 1.6cm,
+        fact/.style={rectangle, draw=accentred, fill=red!10, rounded corners=3pt, thick, align=center, font=\footnotesize\bfseries, inner sep=6pt},
+        dim/.style={rectangle, draw=primaryblue, fill=blue!10, rounded corners=3pt, thick, align=center, font=\footnotesize\bfseries, inner sep=6pt},
+        op/.style={rectangle, draw=accentgreen, fill=green!10, rounded corners=3pt, thick, align=center, font=\footnotesize\bfseries, inner sep=6pt},
+        arrow/.style={draw=primaryblue, -{Latex[length=2.5mm]}, thick}
+    ]
+        % Dimensión Central: Catálogo Maestro
+        \node[dim] (master) {catalogo\_productos\_master\\{\scriptsize PK: sku\_id}\\{\scriptsize producto, cadena, sucursal}\\{\scriptsize categoria, laboratorio, presentacion}\\{\scriptsize enlace\_canonico, imagen}};
+
+        % Tablas Operacionales
+        \node[op, left=1.8cm of master, yshift=1.2cm] (canasta) {canasta\_precios\\{\scriptsize (Hipermaxi / OAP)}\\{\scriptsize id, fecha, departamento}\\{\scriptsize producto, categoria}\\{\scriptsize precio\_bs, fuente, enlace}};
+
+        \node[op, left=1.8cm of master, yshift=-1.2cm] (meds) {medicamentos\_precios\\{\scriptsize (Farmacorp / Chávez)}\\{\scriptsize id, fecha, departamento, cadena}\\{\scriptsize producto, laboratorio, presentacion}\\{\scriptsize precio\_bs, precio\_anterior\_bs, disponible}};
+
+        % Tablas de Hechos (Fact Tables)
+        \node[fact, right=1.8cm of master, yshift=1.2cm] (history) {precios\_historico\\{\scriptsize (Particionada Mensual)}\\{\scriptsize PK: (sku\_id, fecha)}\\{\scriptsize precio\_actual\_bs, delta\_precio\_bs}\\{\scriptsize delta\_porcentaje, disponible}};
+
+        \node[fact, right=1.8cm of master, yshift=-1.2cm] (weekly) {precios\_historico\_semanal\\{\scriptsize (Datos Fríos Agregados)}\\{\scriptsize PK: (sku\_id, anio, semana)}\\{\scriptsize precio\_min\_bs, precio\_max\_bs}\\{\scriptsize precio\_promedio\_bs, observaciones}};
+
+        % Conexiones de Triggers
+        \path[arrow] (canasta.east) -- node[above, sloped, font=\tiny\bfseries] {Trigger Canasta} (master.west);
+        \path[arrow] (meds.east) -- node[below, sloped, font=\tiny\bfseries] {Trigger Medicamentos} (master.west);
+        \path[arrow] (master.east) -- node[above, sloped, font=\tiny\bfseries] {Upsert \& Deltas} (history.west);
+        \path[arrow] (history.south) -- node[right, font=\tiny\bfseries] {Agregación Semanal} (weekly.north);
+    \end{tikzpicture}%
+    }
+    \figurenote{Modelo relacional estrella de series de tiempo. Las tablas operacionales alimentan de manera reactiva el catálogo maestro inmutable y calculan las variaciones en la tabla de hechos particionada \texttt{precios\_historico}.}
+\end{figure}
+
+\subsection{Topología del Grafo de Contrataciones Estatales SICOES}
+En la Figura~\ref{fig:tikz_grafo_sicoes} se representa la estructura de grafo bipartito implementada para el análisis de Minería de Estructura Web sobre el SICOES.
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Topología del Grafo Bipartito de Contrataciones Estatales de La Paz}
+    \label{fig:tikz_grafo_sicoes}
+    \resizebox{0.88\linewidth}{!}{%
+    \begin{tikzpicture}[
+        node distance=1.2cm and 2.4cm,
+        entity/.style={circle, draw=primaryblue, fill=blue!15, thick, align=center, font=\footnotesize\bfseries, inner sep=4pt},
+        rubro/.style={rectangle, draw=accentorange, fill=orange!15, rounded corners=3pt, thick, align=center, font=\footnotesize\bfseries, inner sep=5pt},
+        edge/.style={draw=darkgray, -{Latex[length=2.2mm]}, thick}
+    ]
+        % Nodos de Entidades (Hubs potenciales)
+        \node[entity] (e1) {GAMLP\\{\scriptsize Alcaldía La Paz}};
+        \node[entity, below=0.8cm of e1] (e2) {SEDES\\{\scriptsize Salud La Paz}};
+        \node[entity, below=0.8cm of e2] (e3) {MI\\{\scriptsize Min. Salud}};
+
+        % Nodos de Rubros / Adjudicaciones (Authorities potenciales)
+        \node[rubro, right=2.8cm of e1] (r1) {Fármacos e Insumos Médicos\\{\scriptsize Adjudicación: 1.45M Bs}};
+        \node[rubro, below=0.7cm of r1] (r2) {Equipamiento Hospitalario\\{\scriptsize Adjudicación: 850K Bs}};
+        \node[rubro, below=0.7cm of r2] (r3) {Alimentos y Nutrición Infantil\\{\scriptsize Adjudicación: 420K Bs}};
+
+        % Aristas Dirigidas Ponderadas (Licitaciones CUCE)
+        \path[edge] (e1) -- node[above, sloped, font=\tiny] {CUCE-26-01} (r1);
+        \path[edge] (e1) -- node[above, sloped, font=\tiny] {CUCE-26-04} (r3);
+        \path[edge] (e2) -- node[above, sloped, font=\tiny] {CUCE-26-02} (r1);
+        \path[edge] (e2) -- node[above, sloped, font=\tiny] {CUCE-26-03} (r2);
+        \path[edge] (e3) -- node[below, sloped, font=\tiny] {CUCE-26-05} (r1);
+    \end{tikzpicture}%
+    }
+    \figurenote{Grafo dirigido bipartito de contrataciones públicas. Las entidades convocantes actúan como concentradores (\textit{Hubs}) y los rubros de suministro médico actúan como autoridades (\textit{Authorities}), ponderados por el monto adjudicado.}
+\end{figure}

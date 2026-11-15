@@ -24,6 +24,7 @@ import {
   getMedicamentosPrecios,
   getMedicamentosPreciosPaginado,
   compareMedicamentos,
+  getProductDetail,
 } from './canasta-salud';
 import { askLlama } from './nvidia-ai';
 import { getAppConfig } from './config';
@@ -76,21 +77,54 @@ import {
   renderMedicamentosCatalogoPaginado,
   renderSaludBuscarHint,
   renderFarmaciaBuscarHint,
+  // Templates Producto Ficha
+  renderProductDetail,
 } from './TG-msj';
 
 // Re-exportar tipos para consumidores externos (API routes, tests, etc.)
 export type { TelegramUpdate, BotReply, ReplyMarkup, InlineKeyboardButton, TemplateResult };
 
 export const TELEGRAM_COMMANDS_MENU = [
-  { command: 'start', description: 'Información del bot y guía de comandos' },
+  { command: 'start', description: 'Menú principal y módulos de información' },
   { command: 'sicoes', description: 'Módulo SICOES: licitaciones La Paz e IA' },
-  { command: 'canasta', description: 'Módulo Canasta Familiar (OAP e Hipermaxi)' },
+  { command: 'canasta', description: 'Canasta, alimentos y comercio (Hipermaxi & OAP)' },
   { command: 'salud', description: 'Módulo Centros de Salud y GPS' },
-  { command: 'farmacia', description: 'Precios de medicamentos (Farmacorp & Chávez)' },
+  { command: 'farmacia', description: 'Comparador tri-cadena: Farmacorp, Chávez e Hipermaxi' },
+  { command: 'producto', description: 'Ficha detallada, sucursales e histórico por ID' },
 ];
 
 /**
- * Sub-controlador de Farmacias & Medicamentos
+ * Sub-controlador de Ficha Detallada de Producto (Modal web trasladada a Telegram)
+ */
+async function handleProductDetailCommand(idStr: string): Promise<TemplateResult> {
+  const cleanId = idStr.trim();
+  if (!cleanId) {
+    return {
+      text: '⚠️ Debes indicar el identificador del producto.\nEjemplo: <code>/producto 2328</code> o pulsa el botón <b>🔍 Ver Detalle</b> de cualquier lista.',
+      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+    };
+  }
+
+  try {
+    const detail = await getProductDetail(cleanId);
+    if (!detail) {
+      return {
+        text: `❌ No se encontró ningún producto con ID <code>${escHtml(cleanId)}</code> en la base de datos.`,
+        replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+      };
+    }
+    return renderProductDetail(detail);
+  } catch (err) {
+    console.error('[TELEGRAM] Error obteniendo ficha de producto:', err);
+    return {
+      text: '⚠️ Error al consultar la ficha técnica del producto.',
+      replyMarkup: { inline_keyboard: [BACK_TO_HOME_ROW] },
+    };
+  }
+}
+
+/**
+ * Sub-controlador de Farmacias & Medicamentos (Tri-Cadena)
  */
 async function handleFarmaciaCommand(query?: string, action?: string): Promise<TemplateResult> {
   // Hint explicativo de cómo buscar medicamentos
@@ -103,7 +137,12 @@ async function handleFarmaciaCommand(query?: string, action?: string): Promise<T
     const parts = action.split(':');
     const cadenaKey = parts[1] || 'farmacorp';
     const page = parseInt(parts[2] || '1', 10);
-    const cadena = cadenaKey === 'farmacorp' ? 'Farmacorp' : 'Farmacias Chavez';
+    const cadena =
+      cadenaKey === 'hipermaxi'
+        ? 'Hipermaxi'
+        : cadenaKey === 'farmacorp'
+        ? 'Farmacorp'
+        : 'Farmacias Chavez';
     const paginated = await getMedicamentosPreciosPaginado({ cadena, page, pageSize: 5 });
     return renderMedicamentosCatalogoPaginado(
       cadena,
@@ -115,8 +154,16 @@ async function handleFarmaciaCommand(query?: string, action?: string): Promise<T
   }
 
   // Modo catálogo inicial (Página 1 de 5 elementos)
-  if (action === 'farmacia_cadena_farmacorp' || action === 'farmacia_cadena_chavez') {
-    const cadena = action.includes('farmacorp') ? 'Farmacorp' : 'Farmacias Chavez';
+  if (
+    action === 'farmacia_cadena_farmacorp' ||
+    action === 'farmacia_cadena_chavez' ||
+    action === 'farmacia_cadena_hipermaxi'
+  ) {
+    const cadena = action.includes('hipermaxi')
+      ? 'Hipermaxi'
+      : action.includes('farmacorp')
+      ? 'Farmacorp'
+      : 'Farmacias Chavez';
     const paginated = await getMedicamentosPreciosPaginado({ cadena, page: 1, pageSize: 5 });
     return renderMedicamentosCatalogoPaginado(
       cadena,
@@ -134,7 +181,7 @@ async function handleFarmaciaCommand(query?: string, action?: string): Promise<T
     return renderFarmaciaBuscarHint();
   }
 
-  // Comparativa Farmacorp vs Farmacias Chávez
+  // Comparativa Farmacorp vs Farmacias Chávez vs Hipermaxi Farmacia
   const comp = await compareMedicamentos(searchTerm);
   return renderMedicamentosComparativa(searchTerm, comp);
 }
@@ -189,7 +236,60 @@ async function handleCanastaCommand(args: string, action?: string): Promise<Temp
     return renderCanastaEjeComparativa(comp);
   }
 
-  // Búsqueda por Categoría o Texto libre
+  // Filtrado por Macro-Categorías del Catálogo Unificado
+  if (action?.startsWith('canasta_macro:')) {
+    const macro = action.replace('canasta_macro:', '');
+    let macroTitle = '🧺 Canasta & Alimentos';
+    let catFilter: string | undefined;
+    if (macro === 'limpieza') {
+      macroTitle = '🧼 Limpieza & Hogar';
+      catFilter = 'Hogar';
+    } else if (macro === 'licores') {
+      macroTitle = '🍷 Licores & Bebidas';
+      catFilter = 'Bebidas';
+    } else if (macro === 'personal') {
+      macroTitle = '🧴 Cuidado Personal';
+      catFilter = 'Cuidado Personal';
+    } else if (macro === 'otros') {
+      macroTitle = '📦 Bazar & Textil';
+      catFilter = 'Bazar';
+    }
+    const items = await getCanastaPrecios({ categoria: catFilter, limit: 12 });
+    return renderCanastaItems(items, { title: `${macroTitle} — Eje Central` });
+  }
+
+  // Búsqueda por Texto libre (Omnicanal: todas las sucursales y comercios)
+  if (args && args.trim()) {
+    const q = args.trim();
+    const canastaRows = await getCanastaPrecios({ query: q, limit: 20 });
+
+    // También buscar en medicamentos/retail por si es un producto común (leche, pañales, suplementos, shampoo)
+    let extraRetail: typeof canastaRows = [];
+    try {
+      const medRows = await getMedicamentosPrecios({ query: q, limit: 8 });
+      extraRetail = medRows.map((m) => ({
+        id: `MED_${m.id}`,
+        fecha: m.fecha,
+        departamento: m.departamento,
+        producto: m.producto,
+        categoria: m.categoria || 'Farmacia/Retail',
+        unidad_medida: m.presentacion || '1 Unidad',
+        precio_bs: m.precio_bs,
+        fuente: m.cadena,
+        enlace: m.enlace,
+      }));
+    } catch {
+      // Ignorar fallback
+    }
+
+    const allMatches = [...canastaRows, ...extraRetail];
+    return renderCanastaItems(allMatches, {
+      title: `🔎 <b>Disponibilidad de "${escHtml(q)}" en Todas las Tiendas y Sucursales:</b>`,
+      searchTerm: q,
+    });
+  }
+
+  // Búsqueda por Categoría
   let categoria: string | undefined;
   let title = '🛒 <b>Precios Canasta Familiar — Eje Central</b>';
   if (action === 'canasta_cat_verduras') {
@@ -208,11 +308,10 @@ async function handleCanastaCommand(args: string, action?: string): Promise<Temp
 
   const items = await getCanastaPrecios({
     categoria,
-    query: args || undefined,
     limit: 10,
   });
 
-  return renderCanastaItems(items, { title, searchTerm: args });
+  return renderCanastaItems(items, { title });
 }
 
 /**
@@ -281,14 +380,38 @@ async function resolveAction(params: {
     return renderSaludBuscarHint();
   }
 
+  // Ficha detallada de producto (Web Modal trasladada a Telegram)
+  if (cmd === '/producto' || callbackData?.startsWith('prod_')) {
+    const idTarget = callbackData?.startsWith('prod_')
+      ? callbackData.replace('prod_', '')
+      : args;
+    return handleProductDetailCommand(idTarget);
+  }
+
   // Acciones Canasta Familiar
   if (callbackData?.startsWith('canasta_') || cmd === '/canasta') {
     return handleCanastaCommand(args, callbackData);
   }
 
-  // Acciones Centros de Salud
-  if (callbackData?.startsWith('salud_') || cmd === '/salud') {
-    const tipo = callbackData?.startsWith('salud_tipo_')
+  // Acciones Centros de Salud & Fármacos (/salud)
+  if (cmd === '/salud') {
+    if (!args) {
+      return renderSaludMenu();
+    }
+    // Si el término coincide con fármacos (ej. /salud paracetamol), desplegar comparador tri-cadena
+    try {
+      const medMatches = await getMedicamentosPrecios({ query: args.trim(), limit: 1 });
+      if (medMatches.length > 0) {
+        const comp = await compareMedicamentos(args.trim());
+        return renderMedicamentosComparativa(args.trim(), comp);
+      }
+    } catch {}
+    // Si no es fármaco, buscar en centros de salud OSM (ej. /salud hospital, /salud miraflores)
+    return handleSaludCommand({ query: args.trim() });
+  }
+
+  if (callbackData?.startsWith('salud_')) {
+    const tipo = callbackData.startsWith('salud_tipo_')
       ? callbackData.replace('salud_tipo_', '')
       : undefined;
     return handleSaludCommand({ tipo, query: args || undefined });
@@ -516,6 +639,7 @@ export async function processTelegramMessage(update: TelegramUpdate): Promise<Bo
     chatId,
     text: finalText,
     plainText: htmlToPlainText(finalText),
+    photoUrl: result.photoUrl,
     replyMarkup: result.replyMarkup,
   };
 }
@@ -564,6 +688,7 @@ export async function processTelegramCallback(update: TelegramUpdate): Promise<B
     messageId,
     text: finalText,
     plainText: htmlToPlainText(finalText),
+    photoUrl: result.photoUrl,
     replyMarkup: result.replyMarkup,
   };
 }
@@ -583,6 +708,47 @@ export async function answerCallbackQuery(callbackQueryId: string): Promise<void
       body: JSON.stringify({ callback_query_id: callbackQueryId }),
     });
   } catch {}
+}
+
+/**
+ * Envía una fotografía oficial a Telegram con ficha técnica en caption y teclado interactivo.
+ * Aplica fallback automático a sendTelegramResponse si la URL no es accesible o Telegram la rechaza.
+ */
+export async function sendTelegramPhoto(
+  chatId: number,
+  photoUrl: string,
+  caption: string,
+  replyMarkup?: ReplyMarkup
+): Promise<boolean> {
+  const { telegramBotToken } = getAppConfig();
+  if (!telegramBotToken || !chatId) return false;
+
+  const url = `https://api.telegram.org/bot${telegramBotToken}/sendPhoto`;
+  const trimmedCaption = caption.length > 1020 ? caption.slice(0, 1010) + '...' : caption;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: photoUrl,
+        caption: trimmedCaption,
+        parse_mode: 'HTML',
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }),
+    });
+
+    if (res.ok) return true;
+
+    const errTxt = await res.text();
+    console.warn(`[TELEGRAM SERVICE] Falló sendPhoto (HTTP ${res.status}): ${errTxt}. Aplicando fallback a mensaje regular.`);
+  } catch (err) {
+    console.warn('[TELEGRAM SERVICE] Excepción en sendPhoto, aplicando fallback a mensaje regular:', err);
+  }
+
+  return sendTelegramResponse(chatId, caption, replyMarkup);
 }
 
 /**
