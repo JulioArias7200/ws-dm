@@ -52,7 +52,7 @@ A partir del análisis de las observaciones almacenadas en \texttt{catalogo\_pro
 \end{table}
 
 \begin{interpretacionbox}
-Los resultados evidencian que en fármacos genéricos y de uso masivo (como el Paracetamol y el Ibuprofeno), el margen de dispersión de precios alcanza entre el 30\% y el 35.1\%. En medicamentos para enfermedades crónicas (como el Losartán Potásico para hipertensión), una familia que adquiere el tratamiento mensualmente puede ahorrar hasta 16,00 Bs por caja (30.8\% de ahorro), lo que confirma el impacto social directo del sistema para la economía ciudadana.
+Los resultados evidencian que en fármacos genéricos y de uso masivo (como el Paracetamol y el Ibuprofeno), el margen de dispersión de precios alcanza entre el 30\% y el 35.1\%. En medicamentos para enfermedades crónicas (como el Losartán Potásico para hipertensión), una familia que adquiere el tratamiento mensualmente puede ahorrar hasta 16,00 Bs por caja (30.8\% de ahorro), lo que confirma el impacto social directo del sistema para la economía ciudadana. La validez práctica de estas discrepancias se verifica directamente en la experiencia de usuario del asistente conversacional (Figura~\ref{fig:telegram_pantallas_completas}d), donde la consulta en tiempo real de \textit{Paracetamol} desglosa con fidelidad los precios de lista y enlaces de auditoría entre Farmacorp (35,00 Bs), Chávez (24,50 Bs) e Hipermaxi Farmacia (28,00 Bs).
 \end{interpretacionbox}
 
 \subsection{Métricas de Rendimiento y Latencia Operativa}
@@ -63,8 +63,16 @@ El rendimiento del sistema fue evaluado en términos de velocidad de ingesta, la
     \begin{itemize}[leftmargin=*]
         \item \textit{Farmacias Chávez:} 4,12 productos por segundo, completando la extracción de categorías completas en menos de 13 segundos en modo parametrizado.
         \item \textit{Farmacorp:} 10,50 productos por segundo gracias a la estructura compacta en cuadrícula forzada de Shopify.
-        \item \textit{Hipermaxi:} 2,80 productos por segundo, debido a las pausas intencionales de evasión de WAF y el tiempo requerido para el scroll infinito dinámico.
+        \item \textit{Hipermaxi:} 1,88 productos por segundo en régimen de barrido integral, debido a las pausas intencionales de evasión de WAF y el tiempo requerido para la hidratación del scroll infinito dinámico a través de las 29 sucursales del eje troncal (véase el informe de telemetría consolidado en la Figura~\ref{fig:telemetria_rendimiento_hipermaxi}).
     \end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Banner de Telemetría y Resumen de Rendimiento de Extracción en Hipermaxi}
+    \label{fig:telemetria_rendimiento_hipermaxi}
+    \includegraphics[width=0.90\linewidth]{figuras/imgtiempoHipermaxi.png}
+    \figurenote{Métricas consolidadas de extracción al culminar el rastreo de Hipermaxi. Certifica la recolección exhaustiva de 17.821 productos en 157 minutos y 40 segundos a una tasa media de 1.88 productos/segundo, cubriendo La Paz, Santa Cruz y Cochabamba con persistencia en respaldo JSON y sincronización reactiva en Neon PostgreSQL.}
+\end{figure}
     \item \textbf{Latencia de Consultas con Partition Pruning:} Las consultas sobre \texttt{precios\_historico} filtrando por ventanas mensuales exhibieron tiempos de ejecución promedio de \textbf{22 milisegundos}, en comparación con los 180 milisegundos observados en pruebas sintéticas sobre tablas no particionadas de igual volumen.
     \item \textbf{Eficiencia de Consolidación Semanal:} La rutina de agregación de datos fríos en \texttt{precios\_historico\_semanal} redujo 7 observaciones diarias por SKU a una única tupla representativa con métricas estadísticas (mínimo, máximo y promedio), alcanzando una tasa de compresión de espacio en disco del \textbf{85,7\%}.
 \end{enumerate}

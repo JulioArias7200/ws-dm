@@ -81,11 +81,49 @@ Un aspecto de especial interés en la Figura~\ref{fig:neon_er_diagram} es que la
     \item \textbf{Garantía de Integridad Referencial Reactiva mediante Triggers:} La integridad referencial no se encuentra desatendida; está gobernada a nivel lógico y operacional por las funciones PL/pgSQL mencionadas. Cada vez que una fila ingresa a \texttt{canasta\_precios} o \texttt{medicamentos\_precios}, el trigger asegura automáticamente la existencia y sincronización del registro en \texttt{catalogo\_productos\_master} antes de insertar la observación en \texttt{precios\_historico}, garantizando consistencia absoluta sin penalizar la concurrencia.
 \end{enumerate}
 
+Para complementar la representación física de las tablas y transparentar la gobernanza relacional, la Figura~\ref{fig:er_logico_triggers} ilustra el modelo entidad-relación conceptual/lógico con la propagación reactiva de triggers hacia el catálogo maestro y la tabla de series temporales.
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Diagrama Entidad-Relación Lógico, Modelo Estrella y Triggers de Sincronización}
+    \label{fig:er_logico_triggers}
+    \includegraphics[width=0.95\linewidth]{figuras/imgER.png}
+    \figurenote{Modelo relacional conceptual que ilustra la cardinalidad lógica (1:N) entre el catálogo maestro (\texttt{catalogo\_productos\_master}), el histórico particionado (\texttt{precios\_historico}) y las agregaciones semanales, gobernadas por los triggers reactivos desacoplados desde las tablas operacionales.}
+\end{figure}
+
 \subsection{Asistente Conversacional Telegram (Web Usage Mining)}
 La interacción ciudadana ubicua se canaliza a través del bot oficial de Telegram \textbf{\texttt{@ChatDM7200bot}}, implementado mediante TypeScript y la librería Telegraf dentro del endpoint serverless \texttt{app/api/telegram/route.ts}.
 
 \subsubsection{Arquitectura de Enrutamiento Telegraf y Teclados Interactivos Inline}
-El asistente opera bajo un modelo reactivo basado en webhooks HTTPS seguros. Cuando el usuario interactúa con la interfaz móvil, el enrutador Telegraf clasifica la entrada distinguiendo mensajes textuales planos (\texttt{ctx.message.text}), comandos slash (\texttt{/start}, \texttt{/canasta}, \texttt{/medicamentos}, \texttt{/salud}, \texttt{/sicoes}) e interacciones con teclados en línea (\texttt{ctx.callbackQuery.data}).
+El asistente opera bajo un modelo reactivo basado en webhooks HTTPS seguros. Cuando el usuario interactúa con la interfaz móvil, el enrutador Telegraf clasifica la entrada distinguiendo mensajes textuales planos (\texttt{ctx.message.text}), comandos slash (\texttt{/start}, \texttt{/canasta}, \texttt{/medicamentos}, \texttt{/salud}, \texttt{/sicoes}) e interacciones con teclados en línea (\texttt{ctx.callbackQuery.data}). En la Figura~\ref{fig:telegram_pantallas_completas} se presentan las capturas reales de la interacción con el bot móvil en sus módulos neurálgicos: el menú principal interactivo, la fiscalización de contrataciones del SICOES con filtros e IA, la exploración de la canasta familiar y el comparador farmacéutico tri-cadena en tiempo real.
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Vistas Interactivas del Asistente Conversacional Ciudadano \texttt{@ChatDM7200bot}}
+    \label{fig:telegram_pantallas_completas}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_07_813_org_telegram_messenger_web.jpg}
+        \caption*{(a) Menú interactivo principal (\texttt{/start})}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_16_174_org_telegram_messenger_web.jpg}
+        \caption*{(b) Módulo SICOES con IA (\texttt{/sicoes})}
+    \end{minipage}
+    \vspace{0.4cm}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_23_015_org_telegram_messenger_web.jpg}
+        \caption*{(c) Catálogo Canasta Familiar (\texttt{/canasta})}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_32_006_org_telegram_messenger_web.jpg}
+        \caption*{(d) Comparador tri-cadena (\texttt{/farmacia})}
+    \end{minipage}
+    \figurenote{Capturas de pantalla del bot de Telegram en producción móvil. (a) Menú con teclados en línea interactivos. (b) Consulta de convocatorias estatales con filtros de estado y departamento. (c) Navegación por macro-categorías de la canasta básica. (d) Comparativa tri-cadena en vivo para Paracetamol con desglose de ahorro monetario y enlaces directos.}
+\end{figure}
 
 En la Tabla~\ref{tab:telegram_comandos} se sistematiza la especificación técnica de las rutas conversacionales del bot, documentando los manejadores del backend, las operaciones de persistencia subyacentes y las estructuras de respuesta ciudadana generadas.
 
@@ -124,6 +162,6 @@ La plataforma web complementa al asistente móvil proveyendo una experiencia ana
     \centering
     \caption{Catálogo Visual de Productos de la Canasta Familiar con Precios y Enlaces Directos}
     \label{fig:web_catalogo}
-    \includegraphics[width=0.88\linewidth]{figuras/web_dashboard_catalogo_canasta.png}
-    \figurenote{Vista del catálogo interactivo en Next.js 14. Las imágenes son servidas por el proxy S3 y cada tarjeta expone la comparativa de precios y el enlace de origen para auditoría ciudadana.}
+    \includegraphics[width=0.92\linewidth]{figuras/imgListadoTienda.png}
+    \figurenote{Vista del catálogo interactivo en Next.js 14 (\textit{DataMiner BO}). Exhibe las tarjetas de producto con imágenes optimizadas servidas vía streaming, segmentación multitienda (Hipermaxi Cañoto, Calacoto) y botones directos de auditoría ciudadana.}
 \end{figure}

@@ -16,6 +16,26 @@ La recolección masiva de datos en la web moderna enfrenta obstáculos técnicos
     \figurenote{Pantalla de intercepción de tráfico emitida por Radware Bot Manager en el portal de Hipermaxi Bolivia. Demuestra el bloqueo inmediato de scrapers no instrumentados y justifica la necesidad de utilizar navegadores reales con perfiles persistentes y emulación de interacción humana.}
 \end{figure}
 
+Cuando los bots automatizados persisten en peticiones recurrentes sin almacenar estado o fallan al responder los desafíos criptográficos iniciales de JavaScript, Radware escala la protección hacia un segundo nivel más restrictivo: la pantalla de detección de anomalías con reto interactivo \textit{hCaptcha} (Figura~\ref{fig:radware_captcha}).
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Intercepción Activa de Radware Bot Manager con Desafío hCaptcha ante Anomalías}
+    \label{fig:radware_captcha}
+    \includegraphics[width=0.85\linewidth]{figuras/imgADVERTENCIA1.png}
+    \figurenote{Respuesta perimetral de Radware Bot Manager al detectar anomalías en la firma de navegación o patrones automatizados. Demuestra la escalada hacia retos interactivos de verificación humana (\textit{hCaptcha}) que invalidan los scrapers basados en peticiones HTTP estáticas.}
+\end{figure}
+
+A este blindaje perimetral se añade la complejidad del renderizado dinámico en el navegador del cliente (\textit{Single Page Application}). Plataformas como Hipermaxi no estructuran sus catálogos mediante páginas numeradas estáticas, sino a través de desplazamiento vertical asíncrono (\textit{infinite scrolling}). Al alcanzar el límite inferior de la vista, la aplicación inyecta componentes reactivos de carga con animaciones giratorias (Figura~\ref{fig:hipermaxi_spinner}), exigiendo sincronización precisa para no truncar la recolección de productos.
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Indicador Asíncrono de Carga en Catálogo SPA de Hipermaxi Bolivia}
+    \label{fig:hipermaxi_spinner}
+    \includegraphics[width=0.82\linewidth]{figuras/hipermaxi_scroll_infinito_spinner.png}
+    \figurenote{Captura del DOM dinámico en Hipermaxi durante el desplazamiento vertical. El elemento reactivo \texttt{span:has-text("Obteniendo más productos")} con animación giratoria (\textit{spinner}) exige algoritmos de sincronización basados en eventos de red y mutaciones de interfaz.}
+\end{figure}
+
 Los métodos convencionales de web scraping, basados en clientes HTTP sin motor de renderizado de JavaScript o en instancias efímeras de navegadores sin almacenamiento de estado, fracasan sistemáticamente ante estas defensas. Esto provoca la interrupción de los flujos de ingesta y la generación de conjuntos de datos incompletos o corruptos.
 
 \subsection{Inadecuación de Modelos de Base de Datos Convencionales}

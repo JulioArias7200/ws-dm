@@ -14,11 +14,45 @@ El proceso se articula en seis fases secuenciales e iterativas, descritas a cont
     Se realizó una inspección técnica profunda del DOM, la jerarquía de selectores CSS y los mecanismos de red de cada fuente objetivo:
     \begin{itemize}[leftmargin=*]
         \item \textit{Hipermaxi:} Análisis de la arquitectura SPA Angular, catálogo de 29 sucursales, comportamiento de scroll infinito y respuestas del WAF Radware Bot Manager.
-        \item \textit{Farmacorp:} Identificación de 70+ colecciones temáticas en Shopify y mapeo del paginador numérico \texttt{nav.pagination}.
-        \item \textit{Farmacias Chávez:} Decodificación del componente de paginación simple de Ant Design (\texttt{.ant-pagination-simple-pager}) en su interfaz SSR con Next.js.
+        \item \textit{Farmacorp:} Identificación de 70+ colecciones temáticas en Shopify y mapeo del paginador numérico \texttt{nav.pagination} (Figura~\ref{fig:farmacorp_dom_analisis}).
+        \item \textit{Farmacias Chávez:} Decodificación del componente de paginación simple de Ant Design (\texttt{.ant-pagination-simple-pager}) en su interfaz SSR con Next.js (Figura~\ref{fig:chavez_dom_analisis}).
         \item \textit{SICOES:} Mapeo de formularios ASP.NET, estructuras de tablas de convocatorias y descarga de pliegos DBC.
         \item \textit{OpenStreetMap:} Consulta sobre Overpass API para extraer coordenadas geodésicas y metadatos de 83 centros de salud en La Paz.
     \end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Estructura de Navegación y Paginador Numérico de Farmacorp en Shopify}
+    \label{fig:farmacorp_dom_analisis}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figuras/farmacorp_taxonomia_categorias.png}
+        \caption*{(a) Taxonomía de macro-categorías}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figuras/farmacorp_paginacion_shopify.png}
+        \caption*{(b) Paginador numérico \texttt{nav.pagination}}
+    \end{minipage}
+    \figurenote{Inspección técnica del DOM de Farmacorp. (a) Organización jerárquica de colecciones temáticas. (b) Componente de paginación numérica tradicional que permite recorrer de forma secuencial las 39+ páginas por categoría.}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Jerarquía de Familias y Paginador Simple Ant Design en Farmacias Chávez}
+    \label{fig:chavez_dom_analisis}
+    \begin{minipage}{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figuras/chavez_taxonomia_categorias.png}
+        \caption*{(a) Menú de categorías}
+    \end{minipage}\hfill
+    \begin{minipage}{0.65\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{figuras/chavez_paginacion_ant_design.png}
+        \caption*{(b) Paginación compacta \texttt{.ant-pagination-simple-pager}}
+    \end{minipage}
+    \figurenote{Estructura visual de Farmacias Chávez. (a) Menú lateral con más de 20 familias farmacéuticas. (b) Control de paginación compacta de Ant Design decodificado mediante expresiones regulares sobre el indicador textual de página total.}
+\end{figure}
 
     \item \textbf{Preparación, Limpieza y Normalización de Datos:}  
     Los datos recolectados presentan inconsistencias léxicas, abreviaturas heterogéneas y formatos numéricos locales (comas decimales, prefijos monetarios ``Bs.''). Se implementó un motor de normalización en Node.js que:
@@ -34,10 +68,18 @@ El proceso se articula en seis fases secuenciales e iterativas, descritas a cont
     \item \textbf{Evaluación, Telemetría y Auditoría Técnica:}  
     Validación rigurosa de los flujos de extracción y cálculo:
     \begin{itemize}[leftmargin=*]
-        \item Verificación de tasas de recolección (productos por segundo) y latencias de base de datos.
+        \item Verificación de tasas de recolección (productos por segundo) y latencias de base de datos en consola (Figura~\ref{fig:telemetria_consola_scroll}).
         \item Auditoría de disparadores reactivos mediante inserciones sintéticas controladas y reversión transparente sin afección de datos reales.
         \item Evaluación de la precisión de búsqueda semántica vectorial frente al motor sintáctico tradicional.
     \end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Monitoreo en Consola de la Carga Asíncrona por Lotes en Hipermaxi Calacoto}
+    \label{fig:telemetria_consola_scroll}
+    \includegraphics[width=0.88\linewidth]{figuras/imgEjecucionConsola.png}
+    \figurenote{Salida en tiempo real del crawler durante el desplazamiento vertical continuo. Ilustra la detección del indicador de carga en lotes sucesivos de 50 productos hasta consolidar 401 tarjetas en la categoría congelados sin pérdida de información.}
+\end{figure}
 
     \item \textbf{Despliegue y Consumo Ciudadano Multiplataforma:}  
     Puesta en producción de dos canales de interacción ciudadana de acceso abierto: el bot conversacional en Telegram (\texttt{@ChatDM7200bot}) con navegación por menús inline y geolocalización Haversine; y la plataforma web interactiva en Next.js 14 provista de dashboards comparativos y cartografía dinámica con Leaflet.
