@@ -87,9 +87,10 @@ El proceso se articula en seis fases secuenciales e iterativas, descritas a cont
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Matriz de Fases Metodológicas, Actividades Principales y Entregables del Proyecto}
     \label{tab:fases_metodologia}
-    \begin{tabularx}{\linewidth}{p{3.2cm} p{7.0cm} L}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}p{6.2cm} L}
         \toprule
         \textbf{Fase Metodológica} & \textbf{Actividades Principales} & \textbf{Entregables Técnicos} \\
         \midrule
@@ -97,9 +98,9 @@ El proceso se articula en seis fases secuenciales e iterativas, descritas a cont
         \addlinespace
         2. Comprensión de Datos Web & Auditoría DOM, inspección de protocolos de red, evaluación de WAF Radware y selectores. & Diccionario de 700+ selectores, rutas y parámetros de paginación analizados. \\
         \addlinespace
-        3. Preparación de Datos & Extracción de unidades, normalización de fármacos (40+ principios activos, 35+ laboratorios). & Motor de limpieza en TypeScript y generador de \texttt{sku\_id} canónicos. \\
+        3. Preparación de Datos & Extracción de unidades, normalización de fármacos (40+ principios activos, 35+ laboratorios). & Motor de limpieza en TypeScript y generador de \nolinkurl{sku_id} canónicos. \\
         \addlinespace
-        4. Modelado y Persistencia & Particionamiento mensual, triggers reactivos PL/pgSQL, vectorización NIM y grafos. & Esquema DDL \texttt{schema.sql}, índices HNSW \texttt{pgvector} y tablas de grafos. \\
+        4. Modelado y Persistencia & Particionamiento mensual, triggers reactivos PL/pgSQL, vectorización NIM y grafos. & Esquema DDL \nolinkurl{schema.sql}, índices HNSW \nolinkurl{pgvector} y tablas de grafos. \\
         \addlinespace
         5. Evaluación y Auditoría & Pruebas de carga, telemetría de consola, pruebas de inyección y verificación de deltas. & Banners de telemetría, validación de integridad y métricas cuantitativas auditadas. \\
         \addlinespace

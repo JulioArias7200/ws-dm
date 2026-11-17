@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getGraphEdges } from '@/lib/db';
 import { computeGraphMining } from '@/lib/graph-mining';
 
-export async function GET() {
+export async function GET(_req: Request) {
   try {
     const edges = await getGraphEdges().catch(() => []);
     const result = computeGraphMining(edges, 0.85);

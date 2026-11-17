@@ -7,34 +7,38 @@ La ejecución coordinada de los pipelines de ingesta permitió poblar el ecosist
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Volumetría y Recuentos Reales de Filas Auditadas en Neon Serverless PostgreSQL}
     \label{tab:recuentos_bd}
-    \begin{tabularx}{\linewidth}{p{5.2cm} p{2.2cm} L}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5.6cm} >{\centering\arraybackslash}p{2.2cm} L}
         \toprule
         \textbf{Tabla en Esquema Neon} & \textbf{Recuento Real} & \textbf{Naturaleza y Contenido de los Registros} \\
         \midrule
-        \texttt{catalogo\_productos\_master} & 8.870 & Catálogo maestro inmutable de SKUs unificados de retail y farmacias. \\
-        \texttt{precios\_historico} & 9.509 & Observaciones temporales particionadas mensualmente con deltas calculados. \\
-        \texttt{canasta\_precios} & 9.823 & Registros operacionales de supermercados (Hipermaxi) y OAP. \\
-        \texttt{medicamentos\_precios} & 452 & Registros operacionales de cadenas farmacéuticas (Farmacorp y Chávez). \\
-        \texttt{centros\_salud} & 83 & Hospitales, clínicas y postas georreferenciadas en el departamento de La Paz. \\
-        \texttt{sicoes\_convocatorias} & 127 & Convocatorias estatales vectorizadas con embeddings NVIDIA NIM (1024 dims). \\
-        \texttt{sicoes\_graph\_edges} & 342 & Aristas dirigidas ponderadas entre entidades públicas y rubros de compra. \\
-        \texttt{sicoes\_node\_metrics} & 189 & Métricas topológicas de centralidad, PageRank y HITS por nodo. \\
-        \texttt{sicoes\_usage\_logs} & 428 & Trazas de interacción ciudadana registradas en el bot de Telegram. \\
+        \nolinkurl{catalogo_productos_master} & 8.870 & Catálogo maestro inmutable de SKUs unificados de retail y farmacias. \\
+        \nolinkurl{precios_historico} & 9.509 & Observaciones temporales particionadas mensualmente con deltas calculados. \\
+        \nolinkurl{canasta_precios} & 9.823 & Registros operacionales de supermercados (Hipermaxi) y OAP. \\
+        \nolinkurl{medicamentos_precios} & 452 & Registros operacionales de cadenas farmacéuticas (Farmacorp y Chávez). \\
+        \nolinkurl{centros_salud} & 83 & Hospitales, clínicas y postas georreferenciadas en el departamento de La Paz. \\
+        \nolinkurl{sicoes_convocatorias} & 127 & Convocatorias estatales vectorizadas con embeddings NVIDIA NIM (1024 dims). \\
+        \nolinkurl{sicoes_graph_edges} & 342 & Aristas dirigidas ponderadas entre entidades públicas y rubros de compra. \\
+        \nolinkurl{sicoes_node_metrics} & 189 & Métricas topológicas de centralidad, PageRank y HITS por nodo. \\
+        \nolinkurl{sicoes_usage_logs} & 428 & Trazas de interacción ciudadana registradas en el bot de Telegram. \\
         \bottomrule
     \end{tabularx}
     \tablenote{Cifras auditadas directamente en la base de datos en fecha 15 de noviembre de 2026 tras las pruebas de ingesta y validación de triggers.}
 \end{table}
 
+\clearpage
 \subsection{Comparativa Empírica de Precios y Detección de Ahorro Ciudadano}
-A partir del análisis de las observaciones almacenadas en \texttt{catalogo\_productos\_master} y \texttt{precios\_historico}, se cuantificó la dispersión de precios en artículos esenciales de la canasta médica y familiar en la ciudad de La Paz. La Tabla~\ref{tab:comparativa_ahorro} presenta una muestra representativa de productos comparados simultáneamente entre Farmacorp, Farmacias Chávez e Hipermaxi.
+A partir del análisis de las observaciones almacenadas en \nolinkurl{catalogo_productos_master} y \nolinkurl{precios_historico}, se cuantificó la dispersión de precios en artículos esenciales de la canasta médica y familiar en la ciudad de La Paz. La Tabla~\ref{tab:comparativa_ahorro} presenta una muestra representativa de productos comparados simultáneamente entre Farmacorp, Farmacias Chávez e Hipermaxi.
 
 \begin{table}[htbp]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
     \caption{Comparativa Empírica de Precios y Oportunidades de Ahorro en Fármacos y Canasta Básica}
     \label{tab:comparativa_ahorro}
-    \begin{tabularx}{\linewidth}{p{4.2cm} p{2.1cm} p{1.9cm} p{2.1cm} p{2.2cm} L}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{4.2cm} C C C C C}
         \toprule
         \textbf{Producto / Fármaco} & \textbf{Farmacorp} & \textbf{Chávez} & \textbf{Hipermaxi} & \textbf{Ahorro (Bs)} & \textbf{Ahorro (\%)} \\
         \midrule
@@ -52,7 +56,7 @@ A partir del análisis de las observaciones almacenadas en \texttt{catalogo\_pro
 \end{table}
 
 \begin{interpretacionbox}
-Los resultados evidencian que en fármacos genéricos y de uso masivo (como el Paracetamol y el Ibuprofeno), el margen de dispersión de precios alcanza entre el 30\% y el 35.1\%. En medicamentos para enfermedades crónicas (como el Losartán Potásico para hipertensión), una familia que adquiere el tratamiento mensualmente puede ahorrar hasta 16,00 Bs por caja (30.8\% de ahorro), lo que confirma el impacto social directo del sistema para la economía ciudadana. La validez práctica de estas discrepancias se verifica directamente en la experiencia de usuario del asistente conversacional (Figura~\ref{fig:telegram_pantallas_completas}d), donde la consulta en tiempo real de \textit{Paracetamol} desglosa con fidelidad los precios de lista y enlaces de auditoría entre Farmacorp (35,00 Bs), Chávez (24,50 Bs) e Hipermaxi Farmacia (28,00 Bs).
+Los resultados evidencian que en fármacos genéricos y de uso masivo (como el Paracetamol y el Ibuprofeno), el margen de dispersión de precios alcanza entre el 30\% y el 35.1\%. En medicamentos para enfermedades crónicas (como el Losartán Potásico para hipertensión), una familia que adquiere el tratamiento mensualmente puede ahorrar hasta 16,00 Bs por caja (30.8\% de ahorro), lo que confirma el impacto social directo del sistema para la economía ciudadana. La validez práctica de estas discrepancias se verifica directamente en la experiencia de usuario del asistente conversacional (Figura~\ref{fig:telegram_canasta_farmacia}b), donde la consulta en tiempo real de \textit{Paracetamol} desglosa con fidelidad los precios de lista y enlaces de auditoría entre Farmacorp (35,00 Bs), Chávez (24,50 Bs) e Hipermaxi Farmacia (28,00 Bs).
 \end{interpretacionbox}
 
 \subsection{Métricas de Rendimiento y Latencia Operativa}

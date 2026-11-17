@@ -20,7 +20,12 @@ export function renderProductDetail(detail: ProductDetailResult): ProductTemplat
 
   let text = `${sectorIcon} <b>${escHtml(p.producto)}</b>\n\n`;
 
-  text += `💵 <b>Precio Vigente:</b> <b>${formatPriceBs(p.precio_bs)}</b>\n`;
+  const promo =
+    p.precio_anterior_bs && p.precio_anterior_bs > p.precio_bs
+      ? ` <s>${formatPriceBs(p.precio_anterior_bs)}</s>${p.descuento_pct ? ` (🔥 -${p.descuento_pct}% OFF)` : ''}`
+      : '';
+
+  text += `💵 <b>Precio Vigente:</b> <b>${formatPriceBs(p.precio_bs)}</b>${promo}\n`;
   text += `🏬 <b>Tienda / Fuente:</b> ${escHtml(p.cadena)} (${escHtml(p.departamento)})\n`;
   text += `📦 <b>Presentación / Medida:</b> ${escHtml(p.unidad_medida)}\n`;
   text += `🏷️ <b>Categoría:</b> ${escHtml(p.categoria)}\n`;

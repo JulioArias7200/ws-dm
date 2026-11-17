@@ -91,55 +91,76 @@ Para complementar la representación física de las tablas y transparentar la go
     \figurenote{Modelo relacional conceptual que ilustra la cardinalidad lógica (1:N) entre el catálogo maestro (\texttt{catalogo\_productos\_master}), el histórico particionado (\texttt{precios\_historico}) y las agregaciones semanales, gobernadas por los triggers reactivos desacoplados desde las tablas operacionales.}
 \end{figure}
 
+\clearpage
 \subsection{Asistente Conversacional Telegram (Web Usage Mining)}
 La interacción ciudadana ubicua se canaliza a través del bot oficial de Telegram \textbf{\texttt{@ChatDM7200bot}}, implementado mediante TypeScript y la librería Telegraf dentro del endpoint serverless \texttt{app/api/telegram/route.ts}.
 
 \subsubsection{Arquitectura de Enrutamiento Telegraf y Teclados Interactivos Inline}
-El asistente opera bajo un modelo reactivo basado en webhooks HTTPS seguros. Cuando el usuario interactúa con la interfaz móvil, el enrutador Telegraf clasifica la entrada distinguiendo mensajes textuales planos (\texttt{ctx.message.text}), comandos slash (\texttt{/start}, \texttt{/canasta}, \texttt{/medicamentos}, \texttt{/salud}, \texttt{/sicoes}) e interacciones con teclados en línea (\texttt{ctx.callbackQuery.data}). En la Figura~\ref{fig:telegram_pantallas_completas} se presentan las capturas reales de la interacción con el bot móvil en sus módulos neurálgicos: el menú principal interactivo, la fiscalización de contrataciones del SICOES con filtros e IA, la exploración de la canasta familiar y el comparador farmacéutico tri-cadena en tiempo real.
+El asistente opera bajo un modelo reactivo basado en webhooks HTTPS seguros. Cuando el usuario interactúa con la interfaz móvil, el enrutador Telegraf clasifica la entrada distinguiendo mensajes textuales planos (\texttt{ctx.message.text}), comandos slash (\texttt{/start}, \texttt{/canasta}, \texttt{/medicamentos}, \texttt{/salud}, \texttt{/sicoes}) e interacciones con teclados en línea (\texttt{ctx.callbackQuery.data}). Como se aprecia en la Figura~\ref{fig:telegram_menu_sicoes}, la navegación inicial y la fiscalización del SICOES se estructuran mediante botones interactivos fluidos que no recargan el historial de chat.
 
 \begin{figure}[htbp]
     \centering
-    \caption{Vistas Interactivas del Asistente Conversacional Ciudadano \texttt{@ChatDM7200bot}}
-    \label{fig:telegram_pantallas_completas}
+    \caption{Vistas del Menú Principal y Módulo SICOES con IA en \texttt{@ChatDM7200bot}}
+    \label{fig:telegram_menu_sicoes}
     \begin{minipage}{0.48\linewidth}
         \centering
-        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_07_813_org_telegram_messenger_web.jpg}
+        \includegraphics[height=10.5cm, keepaspectratio]{figuras/Screenshot_2026_11_15_19_01_07_813_org_telegram_messenger_web.jpg}
         \caption*{(a) Menú interactivo principal (\texttt{/start})}
     \end{minipage}\hfill
     \begin{minipage}{0.48\linewidth}
         \centering
-        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_16_174_org_telegram_messenger_web.jpg}
+        \includegraphics[height=10.5cm, keepaspectratio]{figuras/Screenshot_2026_11_15_19_01_16_174_org_telegram_messenger_web.jpg}
         \caption*{(b) Módulo SICOES con IA (\texttt{/sicoes})}
     \end{minipage}
-    \vspace{0.4cm}
+    \figurenote{Capturas de pantalla del bot de Telegram en producción móvil. (a) Menú principal con teclados en línea interactivos (\textit{Inline Keyboards}) hacia las áreas funcionales del sistema. (b) Módulo SICOES con búsqueda semántica asistida por IA y filtros facetados por estado y departamento.}
+\end{figure}
+
+\subsubsection{Módulos de Canasta Familiar y Comparador Tri-Cadena en Vivo}
+Para el monitoreo de bienes de primera necesidad y la detección de asimetrías de precios en farmacias, el bot incorpora interfaces especializadas (Figura~\ref{fig:telegram_canasta_farmacia}):
+
+\begin{figure}[htbp]
+    \centering
+    \caption{Vistas de Canasta Familiar y Comparador Tri-Cadena en \texttt{@ChatDM7200bot}}
+    \label{fig:telegram_canasta_farmacia}
+    \label{fig:telegram_pantallas_completas}
     \begin{minipage}{0.48\linewidth}
         \centering
-        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_23_015_org_telegram_messenger_web.jpg}
-        \caption*{(c) Catálogo Canasta Familiar (\texttt{/canasta})}
+        \includegraphics[height=10.5cm, keepaspectratio]{figuras/Screenshot_2026_11_15_19_01_23_015_org_telegram_messenger_web.jpg}
+        \caption*{(a) Catálogo Canasta Familiar (\texttt{/canasta})}
     \end{minipage}\hfill
     \begin{minipage}{0.48\linewidth}
         \centering
-        \includegraphics[width=0.92\linewidth]{figuras/Screenshot_2026_11_15_19_01_32_006_org_telegram_messenger_web.jpg}
-        \caption*{(d) Comparador tri-cadena (\texttt{/farmacia})}
+        \includegraphics[height=10.5cm, keepaspectratio]{figuras/Screenshot_2026_11_15_19_01_32_006_org_telegram_messenger_web.jpg}
+        \caption*{(b) Comparador tri-cadena en vivo (\texttt{/farmacia})}
     \end{minipage}
-    \figurenote{Capturas de pantalla del bot de Telegram en producción móvil. (a) Menú con teclados en línea interactivos. (b) Consulta de convocatorias estatales con filtros de estado y departamento. (c) Navegación por macro-categorías de la canasta básica. (d) Comparativa tri-cadena en vivo para Paracetamol con desglose de ahorro monetario y enlaces directos.}
+    \figurenote{Capturas de pantalla del asistente móvil en producción. (a) Exploración de macro-categorías comerciales de la canasta básica. (b) Comparativa simultánea de precios para Paracetamol 500 mg entre Farmacorp, Chávez e Hipermaxi Farmacia, detallando el ahorro monetario ($\Delta\text{Bs}$) y enlaces directos de auditoría ciudadana.}
 \end{figure}
 
+\clearpage
+\subsubsection{Especificación de Comandos y Rutas Telegraf}
 En la Tabla~\ref{tab:telegram_comandos} se sistematiza la especificación técnica de las rutas conversacionales del bot, documentando los manejadores del backend, las operaciones de persistencia subyacentes y las estructuras de respuesta ciudadana generadas.
 
 \begin{table}[htbp]
     \centering
+    \footnotesize
+    \renewcommand{\arraystretch}{0.95}
+    \setlength{\tabcolsep}{5pt}
     \caption{Especificación Técnica de Comandos, Rutas Telegraf y Respuestas Estructuradas en \texttt{@ChatDM7200bot}}
     \label{tab:telegram_comandos}
-    \begin{tabularx}{\linewidth}{p{2.3cm} p{2.8cm} p{4.2cm} L}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{3.9cm} >{\raggedright\arraybackslash}p{4.7cm} L}
         \toprule
         \textbf{Comando / Evento} & \textbf{Manejador Telegraf} & \textbf{Operación en Base de Datos / Lógica} & \textbf{Estructura de Respuesta Generada} \\
         \midrule
-        \texttt{/start} & \texttt{bot.start()} & Consulta de sesión y registro de usuario en \texttt{sicoes\_usage\_logs}. & Menú interactivo principal con botones en línea (\textit{Inline Keyboard}) hacia Canasta, Medicamentos, Salud y SICOES. \\
-        \texttt{/canasta} \newline o texto libre & \texttt{bot.hears()} / \texttt{on('text')} & \texttt{SELECT} con \texttt{ILIKE} sobre \texttt{catalogo\_productos\_master} uniendo con \texttt{canasta\_precios}. & Tarjeta Markdown con desglose de precios en Hipermaxi, Farmacorp y Chávez, resaltando el precio mínimo y ahorro potencial ($\Delta\text{Bs}$). \\
-        \texttt{/medicamentos} & \texttt{bot.action(/med\_/)} & Búsqueda parametrizada sobre \texttt{medicamentos\_precios} filtrando por laboratorio y principio activo. & Comparativa farmacéutica multidimensional indicando presentación, descuento porcentual y enlaces canónicos directos de compra. \\
-        Envío de GPS \newline \texttt{location} & \texttt{bot.on('location')} & Ejecución de la fórmula geodésica de Haversine (Eq.~\ref{eq:haversine}) sobre tabla \texttt{centros\_salud}. & Lista ordenada de los 5 centros médicos más próximos al usuario, con distancia calculada en km, teléfono y dirección física. \\
-        \texttt{/sicoes} & \texttt{bot.command('sicoes')} & Búsqueda semántica híbrida vectorial (pgvector) con embeddings de 1024 dimensiones sobre licitaciones. & Ficha ejecutiva de la convocatoria: CUCE, entidad licitante, objeto, monto referencial y puntaje de relevancia semántica. \\
+        \texttt{/start} & \texttt{bot.start()} & Consulta de sesión y registro de usuario en \nolinkurl{sicoes_usage_logs}. & Menú interactivo principal con botones en línea (\textit{Inline Keyboard}) hacia Canasta, Medicamentos, Salud y SICOES. \\
+        \addlinespace[3pt]
+        \texttt{/canasta} \newline o texto libre & \texttt{bot.hears()} / \newline \texttt{on('text')} & \texttt{SELECT} con \texttt{ILIKE} sobre \nolinkurl{catalogo_productos_master} uniendo con \nolinkurl{canasta_precios}. & Tarjeta Markdown con desglose de precios en Hipermaxi, Farmacorp y Chávez, resaltando el precio mínimo y ahorro potencial ($\Delta\text{Bs}$). \\
+        \addlinespace[3pt]
+        \texttt{/medicamentos} & \texttt{bot.action(/med\_/)} & Búsqueda parametrizada sobre \nolinkurl{medicamentos_precios} filtrando por laboratorio y fármaco. & Comparativa farmacéutica multidimensional indicando presentación, descuento porcentual y enlaces canónicos directos de compra. \\
+        \addlinespace[3pt]
+        Envío de GPS \newline (\texttt{location}) & \texttt{bot.on('location')} & Ejecución de la fórmula geodésica de Haversine (Eq.~\ref{eq:haversine}) sobre tabla \nolinkurl{centros_salud}. & Lista ordenada de los 5 centros médicos más próximos al usuario, con distancia calculada en km, teléfono y dirección física. \\
+        \addlinespace[3pt]
+        \texttt{/sicoes} & \texttt{bot.command('sicoes')} & Búsqueda semántica vectorial (\texttt{pgvector}) con embeddings de 1024 dims sobre licitaciones. & Ficha ejecutiva de la convocatoria: CUCE, entidad licitante, objeto, monto referencial y puntaje de relevancia semántica. \\
+        \addlinespace[3pt]
         Botón de Navegación & \texttt{bot.action('menu')} & Limpieza de estado transitorio de sesión y recarga de opciones principales. & Restablecimiento fluido del menú sin recrear el hilo del chat (\texttt{editMessageText}). \\
         \bottomrule
     \end{tabularx}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProductDetail } from '@/lib/canasta-salud';
+import { refreshProductItemById } from '@/lib/item-updater';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,13 +16,30 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const detail = await getProductDetail(id, producto, cadena);
+    let detail = await getProductDetail(id, producto, cadena);
 
     if (!detail) {
       return NextResponse.json(
         { success: false, error: 'Producto no encontrado' },
         { status: 404 }
       );
+    }
+
+    // Actualización automática en vivo si el producto posee enlace oficial
+    if (detail.item?.enlace && detail.item.enlace.startsWith('http')) {
+      try {
+        const refreshed = await refreshProductItemById(id);
+        if (refreshed && refreshed.cambio_detectado) {
+          // Re-cargar detalle para devolver el histórico actualizado con el nuevo punto temporal
+          const updatedDetail = await getProductDetail(id, producto, cadena);
+          if (updatedDetail) {
+            detail = updatedDetail;
+          }
+        }
+      } catch (scrapeErr) {
+        // En caso de corte o desafío anti-bot, conservar datos previos sin interrumpir
+        console.warn('[API DETALLE] Actualización en vivo omitida:', scrapeErr);
+      }
     }
 
     return NextResponse.json({

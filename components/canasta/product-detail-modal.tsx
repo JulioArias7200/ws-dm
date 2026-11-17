@@ -82,11 +82,12 @@ export function ProductDetailModal({ isOpen, onClose, product }: ProductDetailMo
 
   if (!isOpen || !product) return null;
 
-  const isS3 = detail ? detail.isS3 : Boolean(product.isS3);
-  const storeLink = detail?.enlace || product.enlace;
-  const currentPrice = product.precio_bs ?? 0;
-  const prevPrice = product.precio_anterior_bs;
-  const discount = product.descuento_pct;
+  const currentItem = detail?.item || product;
+  const isS3 = detail ? detail.isS3 : Boolean(currentItem.isS3);
+  const storeLink = detail?.enlace || currentItem.enlace;
+  const currentPrice = currentItem.precio_bs ?? 0;
+  const prevPrice = currentItem.precio_anterior_bs;
+  const discount = currentItem.descuento_pct;
 
   return (
     <div

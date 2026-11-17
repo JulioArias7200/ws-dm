@@ -4,18 +4,19 @@ El desarrollo, instrumentación y despliegue del sistema se fundamenta en un eco
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Stack Tecnológico, Herramientas de Desarrollo y Versiones del Sistema}
     \label{tab:stack_tecnologico}
-    \begin{tabularx}{\linewidth}{p{3.5cm} p{3.5cm} L}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}p{4.4cm} L}
         \toprule
         \textbf{Capa Arquitectónica} & \textbf{Tecnología / Versión} & \textbf{Función y Rol Específico en el Ecosistema} \\
         \midrule
         Entorno de Ejecución & Node.js v24.11 LTS & Motor de ejecución asíncrono para scrapers, pipelines de ingesta y scripts de sincronización. \\
-        Lenguaje de Tipado & TypeScript 5.x & Definición de interfaces estáticas para modelos de datos (\texttt{CanastaItem}, \texttt{MedicamentoItem}). \\
+        Lenguaje de Tipado & TypeScript 5.x & Definición de interfaces estáticas para modelos de datos (\nolinkurl{CanastaItem}, \nolinkurl{MedicamentoItem}). \\
         Automatización Web & Playwright 1.48 & Control de Chromium vía CDP, resolución de scroll infinito y manejo de contextos persistentes. \\
         Base de Datos Principal & Neon Serverless PostgreSQL & Motor relacional con escalamiento automático, particionamiento declarativo mensual y triggers PL/pgSQL. \\
-        Indexación Vectorial & Extensión \texttt{pgvector} & Almacenamiento e indexación HNSW para vectores de 1024 dimensiones con métrica de distancia coseno. \\
-        Almacenamiento de Objetos & Neon Object Storage S3 & Bucket \texttt{assets} compatible con AWS S3 para persistencia permanente de imágenes de productos. \\
+        Indexación Vectorial & Extensión \nolinkurl{pgvector} & Almacenamiento e indexación HNSW para vectores de 1024 dimensiones con métrica de distancia coseno. \\
+        Almacenamiento de Objetos & Neon Object Storage S3 & Bucket \nolinkurl{assets} compatible con AWS S3 para persistencia permanente de imágenes de productos. \\
         Inteligencia Artificial & NVIDIA NIM API & Generación de representaciones vectoriales densas para búsqueda semántica híbrida en SICOES. \\
         Plataforma Web Frontend & Next.js 14 (App Router) & Renderizado híbrido (SSR), rutas API REST internas y componentes de visualización reactiva. \\
         Estilos y Cartografía & TailwindCSS y Leaflet & Maquetación adaptable para dispositivos móviles y renderizado de mapas interactivos con capas OpenStreetMap. \\

@@ -43,29 +43,31 @@
 \contentsline {subsubsection}{\numberline {8.3.3}Justificación Técnica del Diagrama Entidad-Relación Físico}{20}{subsubsection.8.3.3}%
 \contentsline {subsection}{\numberline {8.4}Asistente Conversacional Telegram (Web Usage Mining)}{23}{subsection.8.4}%
 \contentsline {subsubsection}{\numberline {8.4.1}Arquitectura de Enrutamiento Telegraf y Teclados Interactivos Inline}{23}{subsubsection.8.4.1}%
-\contentsline {subsubsection}{\numberline {8.4.2}Manejo de Sesiones y Minería de Uso Web}{23}{subsubsection.8.4.2}%
-\contentsline {subsection}{\numberline {8.5}Plataforma Web Interactiva en Next.js 14}{23}{subsection.8.5}%
-\contentsline {section}{\numberline {9}HERRAMIENTAS Y ENTORNO DE DESARROLLO}{26}{section.9}%
-\contentsline {subsection}{\numberline {9.1}Telemetría de Consola y Monitoreo de Extracción en Vivo}{26}{subsection.9.1}%
+\contentsline {subsubsection}{\numberline {8.4.2}Módulos de Canasta Familiar y Comparador Tri-Cadena en Vivo}{24}{subsubsection.8.4.2}%
+\contentsline {subsubsection}{\numberline {8.4.3}Especificación de Comandos y Rutas Telegraf}{25}{subsubsection.8.4.3}%
+\contentsline {subsubsection}{\numberline {8.4.4}Manejo de Sesiones y Minería de Uso Web}{25}{subsubsection.8.4.4}%
+\contentsline {subsection}{\numberline {8.5}Plataforma Web Interactiva en Next.js 14}{25}{subsection.8.5}%
+\contentsline {section}{\numberline {9}HERRAMIENTAS Y ENTORNO DE DESARROLLO}{25}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Telemetría de Consola y Monitoreo de Extracción en Vivo}{28}{subsection.9.1}%
 \contentsline {section}{\numberline {10}RESULTADOS Y MÉTRICAS AUDITADAS}{28}{section.10}%
-\contentsline {subsection}{\numberline {10.1}Volumetría y Recuentos Reales del Catálogo de Datos}{28}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}Comparativa Empírica de Precios y Detección de Ahorro Ciudadano}{28}{subsection.10.2}%
-\contentsline {subsection}{\numberline {10.3}Métricas de Rendimiento y Latencia Operativa}{31}{subsection.10.3}%
-\contentsline {section}{\numberline {11}ARQUITECTURA DEL SISTEMA}{31}{section.11}%
-\contentsline {subsection}{\numberline {11.1}Arquitectura General del Sistema End-to-End}{32}{subsection.11.1}%
-\contentsline {subsection}{\numberline {11.2}Modelo Relacional Estrella de Datos en Neon PostgreSQL}{32}{subsection.11.2}%
+\contentsline {subsection}{\numberline {10.1}Volumetría y Recuentos Reales del Catálogo de Datos}{29}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Comparativa Empírica de Precios y Detección de Ahorro Ciudadano}{31}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Métricas de Rendimiento y Latencia Operativa}{32}{subsection.10.3}%
+\contentsline {section}{\numberline {11}ARQUITECTURA DEL SISTEMA}{33}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Arquitectura General del Sistema End-to-End}{33}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Modelo Relacional Estrella de Datos en Neon PostgreSQL}{33}{subsection.11.2}%
 \contentsline {subsection}{\numberline {11.3}Topología del Grafo de Contrataciones Estatales SICOES}{33}{subsection.11.3}%
 \contentsline {section}{\numberline {12}CONCLUSIONES Y RECOMENDACIONES}{33}{section.12}%
 \contentsline {subsection}{\numberline {12.1}Conclusiones}{33}{subsection.12.1}%
 \contentsline {subsection}{\numberline {12.2}Recomendaciones y Trabajo Futuro}{35}{subsection.12.2}%
-\contentsline {section}{\numberline {13}RECURSOS Y ENLACES DEL PROYECTO}{35}{section.13}%
-\contentsline {subsection}{\numberline {13.1}Interfaces y Repositorios Oficiales del Proyecto}{35}{subsection.13.1}%
+\contentsline {section}{\numberline {13}RECURSOS Y ENLACES DEL PROYECTO}{36}{section.13}%
+\contentsline {subsection}{\numberline {13.1}Interfaces y Repositorios Oficiales del Proyecto}{36}{subsection.13.1}%
 \contentsline {subsection}{\numberline {13.2}Directorio de Servicios Retail y Farmacéuticos Utilizados}{36}{subsection.13.2}%
-\contentsline {subsection}{\numberline {13.3}Servicios Gubernamentales, Estadísticos y Geoespaciales}{36}{subsection.13.3}%
-\contentsline {subsection}{\numberline {13.4}Servicios en la Nube, Almacenamiento, IA y APIs Internas}{36}{subsection.13.4}%
-\contentsline {section}{\numberline {14}ANEXOS TÉCNICOS}{36}{section.14}%
-\contentsline {subsection}{\numberline {14.1}Anexo A: Definición del Esquema DDL en Neon PostgreSQL (schema.sql)}{36}{subsection.14.1}%
-\contentsline {subsection}{\numberline {14.2}Anexo B: Procedimiento de Backfill In-Engine (backfill.sql)}{40}{subsection.14.2}%
-\contentsline {subsection}{\numberline {14.3}Anexo C: Catálogo Técnico de Selectores DOM Validados}{41}{subsection.14.3}%
-\contentsline {subsection}{\numberline {14.4}Anexo D: Plataformas Web de Comercio Retail y Farmacéutico Auditadas}{41}{subsection.14.4}%
-\contentsline {section}{REFERENCIAS BIBLIOGRÁFICAS}{42}{section*.32}%
+\contentsline {subsection}{\numberline {13.3}Servicios Gubernamentales, Estadísticos y Geoespaciales}{37}{subsection.13.3}%
+\contentsline {subsection}{\numberline {13.4}Servicios en la Nube, Almacenamiento, IA y APIs Internas}{37}{subsection.13.4}%
+\contentsline {section}{\numberline {14}ANEXOS TÉCNICOS}{37}{section.14}%
+\contentsline {subsection}{\numberline {14.1}Anexo A: Definición del Esquema DDL en Neon PostgreSQL (schema.sql)}{37}{subsection.14.1}%
+\contentsline {subsection}{\numberline {14.2}Anexo B: Procedimiento de Backfill In-Engine (backfill.sql)}{41}{subsection.14.2}%
+\contentsline {subsection}{\numberline {14.3}Anexo C: Catálogo Técnico de Selectores DOM Validados}{42}{subsection.14.3}%
+\contentsline {subsection}{\numberline {14.4}Anexo D: Plataformas Web de Comercio Retail y Farmacéutico Auditadas}{43}{subsection.14.4}%
+\contentsline {section}{REFERENCIAS BIBLIOGRÁFICAS}{44}{section*.33}%

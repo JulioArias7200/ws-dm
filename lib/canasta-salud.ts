@@ -1,4 +1,5 @@
 import { neonQuery } from './db';
+import { buildTokenizedConditions } from './item-updater';
 
 export interface CanastaItem {
   id?: string | number;
@@ -8,6 +9,8 @@ export interface CanastaItem {
   categoria: string;
   unidad_medida: string;
   precio_bs: number;
+  precio_anterior_bs?: number | null;
+  descuento_pct?: number | null;
   fuente?: string;
   imagen?: string | null;
   enlace?: string | null;
@@ -208,9 +211,10 @@ export async function getCanastaPrecios(options: {
       conditions.push(`categoria = $${params.length}`);
     }
 
-    if (options.query) {
-      params.push(`%${options.query}%`);
-      conditions.push(`producto ILIKE $${params.length}`);
+    if (options.query && options.query.trim()) {
+      const tokenFilter = buildTokenizedConditions(options.query, params.length + 1, ['producto', 'categoria']);
+      conditions.push(`(${tokenFilter.sql})`);
+      params.push(...tokenFilter.params);
     }
 
     const limitVal = options.limit && options.limit > 0 ? options.limit : 1000;
@@ -492,9 +496,10 @@ export async function getMedicamentosPrecios(options: {
       conditions.push(`cadena ILIKE $${params.length}`);
     }
 
-    if (options.query) {
-      params.push(`%${options.query}%`);
-      conditions.push(`(producto ILIKE $${params.length} OR laboratorio ILIKE $${params.length} OR categoria ILIKE $${params.length})`);
+    if (options.query && options.query.trim()) {
+      const tokenFilter = buildTokenizedConditions(options.query, params.length + 1, ['producto', 'laboratorio', 'categoria']);
+      conditions.push(`(${tokenFilter.sql})`);
+      params.push(...tokenFilter.params);
     }
 
     if (options.departamento) {
@@ -890,8 +895,9 @@ export async function getUnifiedCatalogProducts(
   }
 
   if (options.query && options.query.trim()) {
-    params.push(`%${options.query.trim()}%`);
-    conditions.push(`(producto ILIKE $${params.length} OR categoria ILIKE $${params.length} OR COALESCE(laboratorio, '') ILIKE $${params.length})`);
+    const tokenFilter = buildTokenizedConditions(options.query, params.length + 1, ['producto', 'categoria', "COALESCE(laboratorio, '')"]);
+    conditions.push(`(${tokenFilter.sql})`);
+    params.push(...tokenFilter.params);
   }
 
   if (options.minPrice != null && options.minPrice >= 0) {

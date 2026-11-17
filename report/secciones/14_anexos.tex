@@ -112,32 +112,35 @@ ORDER BY 'CANASTA_' || UPPER(REGEXP_REPLACE(fuente, '\s+', '_', 'g')) || '_' || 
 ON CONFLICT (sku_id) DO NOTHING;
 \end{lstlisting}
 
+\clearpage
 \subsection{Anexo C: Catálogo Técnico de Selectores DOM Validados}
 En la Tabla~\ref{tab:anexo_selectores} se detallan los selectores CSS y patrones de extracción validados en los scrapers de Playwright.
 
 \begin{table}[htbp]
     \centering
+    \small
     \caption{Catálogo Técnico de Selectores DOM e Indicadores Dinámicos en Scrapers}
     \label{tab:anexo_selectores}
-    \begin{tabularx}{\linewidth}{p{3.2cm} p{4.5cm} L}
+    \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{4.2cm} L}
         \toprule
         \textbf{Plataforma} & \textbf{Elemento Objetivo} & \textbf{Selector DOM / Expresión Regular} \\
         \midrule
-        Hipermaxi & Contenedor de Producto & \texttt{div.product-item}, \texttt{div.card-product} \\
-        Hipermaxi & Título y Marca & \texttt{h3.product-title}, \texttt{.brand-name} \\
-        Hipermaxi & Precio Unitario & \texttt{.product-price}, \texttt{span.price-value} \\
+        Hipermaxi & Contenedor de Producto & \nolinkurl{div.product-item}, \nolinkurl{div.card-product} \\
+        Hipermaxi & Título y Marca & \nolinkurl{h3.product-title}, \nolinkurl{.brand-name} \\
+        Hipermaxi & Precio Unitario & \nolinkurl{.product-price}, \nolinkurl{span.price-value} \\
         Hipermaxi & Flag Scroll Infinito & \texttt{span:has-text("Obteniendo más productos")} \\
-        Farmacorp & Tarjeta de Producto & \texttt{.product-item}, \texttt{.grid-item} \\
-        Farmacorp & Paginador Numérico & \texttt{nav.pagination}, \texttt{.pagination\_\_item} \\
-        Farmacorp & Precio y Descuento & \texttt{.price--highlight}, \texttt{.price--compare} \\
-        Farmacias Chávez & Paginación Simple & \texttt{.ant-pagination-simple-pager} (\texttt{/\textbackslash/\textbackslash s*(\textbackslash d+)/}) \\
-        Farmacias Chávez & Selector de Tarjeta & \texttt{div[class*="ProductCard"]}, \texttt{.ant-card} \\
-        Farmacias Chávez & Botón Siguiente Página & \path{.ant-pagination-next:not(.ant-pagination-disabled)} \\
+        Farmacorp & Tarjeta de Producto & \nolinkurl{.product-item}, \nolinkurl{.grid-item} \\
+        Farmacorp & Paginador Numérico & \nolinkurl{nav.pagination}, \nolinkurl{.pagination__item} \\
+        Farmacorp & Precio y Descuento & \nolinkurl{.price--highlight}, \nolinkurl{.price--compare} \\
+        Farmacias Chávez & Paginación Simple & \nolinkurl{.ant-pagination-simple-pager} (\texttt{/\textbackslash s*(\textbackslash d+)/}) \\
+        Farmacias Chávez & Selector de Tarjeta & \nolinkurl{div[class*="ProductCard"]}, \nolinkurl{.ant-card} \\
+        Farmacias Chávez & Botón Siguiente Página & \nolinkurl{.ant-pagination-next:not(.ant-pagination-disabled)} \\
         \bottomrule
     \end{tabularx}
     \tablenote{Resumen de los selectores DOM optimizados en el código fuente de los scrapers.}
 \end{table}
 
+\clearpage
 \subsection{Anexo D: Plataformas Web de Comercio Retail y Farmacéutico Auditadas}
 Para documentar la fisonomía y complejidad visual de las fuentes de datos analizadas, la Figura~\ref{fig:tiendas_retail_storefronts} presenta las interfaces de usuario de las cadenas farmacéuticas inspeccionadas.
 

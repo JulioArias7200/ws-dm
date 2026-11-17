@@ -26,6 +26,7 @@ import {
   compareMedicamentos,
   getProductDetail,
 } from './canasta-salud';
+import { refreshProductItemById } from './item-updater';
 import { askLlama } from './nvidia-ai';
 import { getAppConfig } from './config';
 
@@ -106,6 +107,16 @@ async function handleProductDetailCommand(idStr: string): Promise<TemplateResult
   }
 
   try {
+    // Actualización automática en vivo del producto (precios, ofertas e histórico)
+    try {
+      await Promise.race([
+        refreshProductItemById(cleanId),
+        new Promise((resolve) => setTimeout(resolve, 3500)),
+      ]);
+    } catch (refreshErr) {
+      console.warn('[TELEGRAM] Fallback refreshProductItemById:', refreshErr);
+    }
+
     const detail = await getProductDetail(cleanId);
     if (!detail) {
       return {
@@ -277,12 +288,37 @@ async function handleCanastaCommand(args: string, action?: string): Promise<Temp
         precio_bs: m.precio_bs,
         fuente: m.cadena,
         enlace: m.enlace,
+        precio_anterior_bs: m.precio_anterior_bs,
+        descuento_pct: m.descuento_pct,
       }));
     } catch {
       // Ignorar fallback
     }
 
     const allMatches = [...canastaRows, ...extraRetail];
+
+    // Actualización automática en segundo plano / tiempo real de los principales resultados con enlace web
+    const candidatesToRefresh = allMatches.filter((p) => p.enlace && p.id).slice(0, 2);
+    if (candidatesToRefresh.length > 0) {
+      try {
+        await Promise.race([
+          Promise.allSettled(
+            candidatesToRefresh.map(async (c) => {
+              const res = await refreshProductItemById(String(c.id));
+              if (res?.cambio_detectado) {
+                c.precio_bs = res.precio_actual_bs;
+                c.precio_anterior_bs = res.precio_anterior_bs;
+                c.descuento_pct = res.descuento_pct;
+              }
+            })
+          ),
+          new Promise((resolve) => setTimeout(resolve, 3500)),
+        ]);
+      } catch (err) {
+        console.warn('[TELEGRAM] Error en auto-refresh en demanda:', err);
+      }
+    }
+
     return renderCanastaItems(allMatches, {
       title: `🔎 <b>Disponibilidad de "${escHtml(q)}" en Todas las Tiendas y Sucursales:</b>`,
       searchTerm: q,
@@ -403,6 +439,24 @@ async function resolveAction(params: {
       const medMatches = await getMedicamentosPrecios({ query: args.trim(), limit: 1 });
       if (medMatches.length > 0) {
         const comp = await compareMedicamentos(args.trim());
+        // Actualización automática en segundo plano rápido de los candidatos principales
+        const candidates = comp.items.filter((i) => i.enlace && i.id).slice(0, 2);
+        if (candidates.length > 0) {
+          try {
+            await Promise.race([
+              Promise.allSettled(
+                candidates.map(async (c) => {
+                  const refreshed = await refreshProductItemById(`MED_${c.id}`);
+                  if (refreshed?.cambio_detectado) {
+                    c.precio_bs = refreshed.precio_actual_bs;
+                    c.descuento_pct = refreshed.descuento_pct;
+                  }
+                })
+              ),
+              new Promise((resolve) => setTimeout(resolve, 3500)),
+            ]);
+          } catch {}
+        }
         return renderMedicamentosComparativa(args.trim(), comp);
       }
     } catch {}

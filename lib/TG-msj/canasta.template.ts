@@ -132,6 +132,11 @@ export function renderCanastaItems(
         const src = p.fuente ? ` <i>(${escHtml(p.fuente)})</i>` : '';
         const link = p.enlace ? ` — <a href="${escHtml(p.enlace)}">🔗 Ver</a>` : '';
 
+        const promo =
+          p.precio_anterior_bs && p.precio_anterior_bs > p.precio_bs
+            ? ` <s>${formatPriceBs(p.precio_anterior_bs)}</s>${p.descuento_pct ? ` (🔥 -${p.descuento_pct}% OFF)` : ''}`
+            : '';
+
         if (p.id && detailButtons.length < 4) {
           detailButtons.push({
             text: `🔍 #${idx + 1} Ficha: ${formatPriceBs(p.precio_bs)}`,
@@ -139,7 +144,7 @@ export function renderCanastaItems(
           });
         }
 
-        return `• ${icon} <b>${escHtml(p.producto)}</b>${depto}${src}\n  💵 <b>${formatPriceBs(p.precio_bs)}</b> / ${escHtml(p.unidad_medida)}${link}`;
+        return `• ${icon} <b>${escHtml(p.producto)}</b>${depto}${src}\n  💵 <b>${formatPriceBs(p.precio_bs)}</b>${promo} / ${escHtml(p.unidad_medida)}${link}`;
       })
       .join('\n\n');
   } else {
